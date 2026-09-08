@@ -6,12 +6,14 @@ use taipei::tokio::InstrumentedTokioRuntime;
 use tower::{make::Shared, ServiceBuilder};
 
 fn main() -> anyhow::Result<()> {
+    // instrument tokios CPU usage
     let instrumented = InstrumentedTokioRuntime::new()?;
     let instr = instrumented.instrumentation();
     let handle = instrumented.runtime.handle().clone();
 
     let my_service = Router::new().route("/", get(|| async { "hello" }));
 
+    // hold requests while CPU usage is above 50%
     let inner = ServiceBuilder::new()
         .layer(CpuBackpressureLayer::new(&instr))
         .service(my_service);
