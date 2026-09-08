@@ -129,7 +129,7 @@ pub(crate) async fn run(ctx: Ctx<Setup, FleetMsg>, _seed: crate::PageSeed, _key:
         div css=[crate::atoms::sim_card::styles::CARD] {
             @if ($zoomed) {
                 div css=[styles::BAR] {
-                    Invite when=(up_when) hint=("there are ten — take a look ↑") {
+                    Invite when=(up_when) hint=("Click to see summary view") {
                         Button kind=(ButtonKind::Ghost) label=(up_lbl) pressed=>(|_| FleetMsg::Up)
                     }
                     span css=[styles::WHO] { $focused_name }
