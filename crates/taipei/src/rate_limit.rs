@@ -3,7 +3,7 @@
 //! [`tenant`](crate::tenant) measures: it mints shut-time and splits it between the
 //! requests that were on the server while the gate was closed. This is the other half —
 //! acting on that measurement. A server writes what each tenant cost it and reads back
-//! the fraction of that tenant's traffic to refuse, and [`RateLimitLayer`] refuses it.
+//! the fraction of that tenant's traffic to refuse, and [`EnforcerLayer`] refuses it.
 //!
 //! Both directions go through [`Limits`], and neither is answered here. The share is a
 //! *fleet* decision: one server's blame is not the bill, and one server's idea of a fair
@@ -27,7 +27,7 @@
 //! honest: a share is a statement about the traffic *now*, so a tenant refused hard for a
 //! minute and then forgiven must not spend the next minute paying off the old rate.
 //!
-//! The tally is the *server's*, not a connection's: clones of a [`RateLimitService`] share
+//! The tally is the *server's*, not a connection's: clones of a [`EnforcerService`] share
 //! it, because a per-clone tally on a stack that clones per request would never count past
 //! one.
 
@@ -66,28 +66,28 @@ pub trait Limits: Send + Sync + 'static {
 // --- Layer ---
 
 /// Refuses a share of each tenant's requests, as [`Limits`] currently says.
-pub struct RateLimitLayer<L> {
+pub struct EnforcerLayer<L> {
     limits: Arc<L>,
     tally: Tally,
 }
 
-impl<L: Limits> RateLimitLayer<L> {
+impl<L: Limits> EnforcerLayer<L> {
     pub fn new(limits: Arc<L>) -> Self {
-        RateLimitLayer { limits, tally: Tally::default() }
+        EnforcerLayer { limits, tally: Tally::default() }
     }
 }
 
-impl<L> Clone for RateLimitLayer<L> {
+impl<L> Clone for EnforcerLayer<L> {
     fn clone(&self) -> Self {
-        RateLimitLayer { limits: Arc::clone(&self.limits), tally: self.tally.clone() }
+        EnforcerLayer { limits: Arc::clone(&self.limits), tally: self.tally.clone() }
     }
 }
 
-impl<S, L: Limits> Layer<S> for RateLimitLayer<L> {
-    type Service = RateLimitService<S, L>;
+impl<S, L: Limits> Layer<S> for EnforcerLayer<L> {
+    type Service = EnforcerService<S, L>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        RateLimitService { inner, limits: Arc::clone(&self.limits), tally: self.tally.clone() }
+        EnforcerService { inner, limits: Arc::clone(&self.limits), tally: self.tally.clone() }
     }
 }
 
@@ -145,15 +145,15 @@ enum Refusal {
 
 // --- Service ---
 
-pub struct RateLimitService<S, L> {
+pub struct EnforcerService<S, L> {
     inner: S,
     limits: Arc<L>,
     tally: Tally,
 }
 
-impl<S: Clone, L> Clone for RateLimitService<S, L> {
+impl<S: Clone, L> Clone for EnforcerService<S, L> {
     fn clone(&self) -> Self {
-        RateLimitService {
+        EnforcerService {
             inner: self.inner.clone(),
             limits: Arc::clone(&self.limits),
             tally: self.tally.clone(),
@@ -161,7 +161,7 @@ impl<S: Clone, L> Clone for RateLimitService<S, L> {
     }
 }
 
-impl<S, L, Req> Service<Req> for RateLimitService<S, L>
+impl<S, L, Req> Service<Req> for EnforcerService<S, L>
 where
     S: Service<Req>,
     S::Error: Into<BoxError>,
@@ -277,7 +277,7 @@ mod tests {
 
     /// Send `n` requests from one tenant and report which of them were refused.
     async fn run(limits: Arc<Fixed>, tenant: &'static str, n: usize) -> Vec<bool> {
-        let mut svc = RateLimitLayer::new(limits).layer(Echo);
+        let mut svc = EnforcerLayer::new(limits).layer(Echo);
         let mut refused = Vec::new();
         for _ in 0..n {
             let call = svc.ready().await.unwrap().call(Req(tenant));
@@ -331,7 +331,7 @@ mod tests {
     #[tokio::test]
     async fn tenants_are_charged_separately() {
         let limits = Fixed::at(&[("Alice", 1.0), ("Bob", 0.0)]);
-        let mut svc = RateLimitLayer::new(limits).layer(Echo);
+        let mut svc = EnforcerLayer::new(limits).layer(Echo);
         for tenant in ["Alice", "Bob", "Alice", "Bob"] {
             let refused = svc.ready().await.unwrap().call(Req(tenant)).await.is_err();
             assert_eq!(refused, tenant == "Alice", "{tenant}");
@@ -343,7 +343,7 @@ mod tests {
     #[tokio::test]
     async fn clones_share_one_tally() {
         let limits = Fixed::at(&[("Alice", 0.5)]);
-        let svc = RateLimitLayer::new(limits).layer(Echo);
+        let svc = EnforcerLayer::new(limits).layer(Echo);
         let mut refused = Vec::new();
         for _ in 0..6 {
             let mut per_request = svc.clone();
@@ -360,7 +360,7 @@ mod tests {
     #[tokio::test]
     async fn a_new_share_starts_a_new_run() {
         let limits = Fixed::at(&[("Alice", 1.0)]);
-        let mut svc = RateLimitLayer::new(Arc::clone(&limits)).layer(Echo);
+        let mut svc = EnforcerLayer::new(Arc::clone(&limits)).layer(Echo);
         let mut refused = Vec::new();
         for at in 0..8 {
             if at == 4 {
