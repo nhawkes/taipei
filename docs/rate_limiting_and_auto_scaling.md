@@ -34,14 +34,14 @@ The trick taipei uses is it attributes queuing to tenants. As we are running we 
 { "sim": "blame", "width": 980, "height": 900 }
 ```
 
-Once we have blame we start dropping requests based on it. We need to go from our blame numbers to some drop percentage. Theres many way to do this, for this we'll assume blame is accumerlated into Redis or something similar, and some seperate service reads redis numbers each second, predicts what the demand will be for the next second based on history, and then set a drop percentage for each client which would bring the total under budget. 
+Once we have blame, we can start dropping requests based on it. We need to go from our blame numbers to some drop percentage. Theres many way to do this, for this we'll assume blame is accumerlated into Redis or something similar, and some seperate service reads redis numbers each second, predicts what the demand will be for the next second based on history, and then set a drop percentage for each client which would bring the total under budget. 
 
-@TODO prose introducing the sim: what the three columns are, and why the loop takes three seconds to react.
+We can simulate taking the blame, pushing to some remote store and then reading from that store what percentage of requests to drop. Pushing, calculating and reading all takes a second here so there is a delay from overload to actually enforcing. The simulation starts with enforcement disabled to show the overload.
 
 ```sim
 { "sim": "rate-limit", "width": 980, "height": 760 }
 ```
 
-@TODO prose on what the presets show — in particular that a quiet tenant is never refused, and that a tenant sending a few expensive requests is refused as readily as one sending many cheap ones.
+You can try different scenarios. This scheme works both for different QPS between clients but also different weights of request. You can also choose to deliberately favour one client over another.
 
 Note this schema works even if the tenants are sending different weighted requests. If Alice sends cheap requests and Bob sends heavy requests, we blame each correctly and are able to enforce only against the heavy client.
