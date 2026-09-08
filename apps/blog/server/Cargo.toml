@@ -6,12 +6,12 @@ description = "The blog's server — a thin main over idyll-serve: data and infr
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-idyll-serve = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3" }
-idyll-data = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3", default-features = false }
+idyll-serve = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca" }
+idyll-data = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca", default-features = false }
 blog-app = { path = "../app" }
 blog-core = { path = "../../../crates/blog-core" }
 blog-fonts = { path = "../../../crates/blog-fonts" }
-idyll-route = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3" }
+idyll-route = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca" }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

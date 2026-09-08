@@ -17,6 +17,6 @@ anyhow = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
 strum = { version = "0.26", features = ["derive"] }
-idyll-route = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3" }
-idyll = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3" }
-idyll-styles = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3" }
+idyll-route = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca" }
+idyll = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca" }
+idyll-styles = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca" }

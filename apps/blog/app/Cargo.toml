@@ -11,11 +11,11 @@ description = "The blog's island table — the `sim` island (DOM simulations, in
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-idyll = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3" }
-idyll-data = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3", default-features = false }
-idyll-styles = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3" }
+idyll = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca" }
+idyll-data = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca", default-features = false }
+idyll-styles = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca" }
 blog-core = { path = "../../../crates/blog-core", default-features = false }
-idyll-route = { git = "https://github.com/nhawkes/idyll", rev = "7b6d79508b58a24945aa2261511f9967be6e3ba3" }
+idyll-route = { git = "https://github.com/nhawkes/idyll", rev = "76a6b299d2ab4372c2735343d2808de0951a10ca" }
 serde = { workspace = true }
 
 # The queue visualiser runs the REAL taipei middleware inside the island: a tokio

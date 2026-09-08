@@ -1615,7 +1615,7 @@ dependencies = [
 [[package]]
 name = "idyll"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "html-escape",
  "idyll-macros",
@@ -1632,7 +1632,7 @@ dependencies = [
 [[package]]
 name = "idyll-data"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "derive-where",
  "idyll",
@@ -1646,7 +1646,7 @@ dependencies = [
 [[package]]
 name = "idyll-host"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "anyhow",
  "idyll",
@@ -1658,7 +1658,7 @@ dependencies = [
 [[package]]
 name = "idyll-macros"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "idyll-schema",
  "idyll-styles-parse",
@@ -1671,7 +1671,7 @@ dependencies = [
 [[package]]
 name = "idyll-route"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "idyll-macros",
  "percent-encoding",
@@ -1680,7 +1680,7 @@ dependencies = [
 [[package]]
 name = "idyll-schema"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "serde",
  "serde_json",
@@ -1690,7 +1690,7 @@ dependencies = [
 [[package]]
 name = "idyll-serve"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "anyhow",
  "axum",
@@ -1727,7 +1727,7 @@ dependencies = [
 [[package]]
 name = "idyll-styles"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "anyhow",
  "idyll",
@@ -1742,7 +1742,7 @@ dependencies = [
 [[package]]
 name = "idyll-styles-parse"
 version = "0.1.0"
-source = "git+https://github.com/nhawkes/idyll?rev=7b6d79508b58a24945aa2261511f9967be6e3ba3#7b6d79508b58a24945aa2261511f9967be6e3ba3"
+source = "git+https://github.com/nhawkes/idyll?rev=76a6b299d2ab4372c2735343d2808de0951a10ca#76a6b299d2ab4372c2735343d2808de0951a10ca"
 dependencies = [
  "proc-macro2",
  "syn 2.0.117",
