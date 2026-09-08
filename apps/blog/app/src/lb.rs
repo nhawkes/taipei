@@ -18,11 +18,12 @@ use std::collections::VecDeque;
 use idyll::{live_view, Ctx, MutableVec, Rect, Setup, Shape, Signal};
 use idyll_styles::styles;
 
+use crate::atoms::figure::{count, slots};
 use crate::atoms::button::styles as bstyles;
 use crate::atoms::client_strip::{ink, ink_frame, ClientStrip};
 use crate::atoms::cut::ramp;
 use crate::atoms::lanes::{Ink, LaneTier, WIRES};
-use crate::atoms::server_box::{group, server_name, styles as sbstyles, ServerBox};
+use crate::atoms::server_box::{server_name, styles as sbstyles, ServerBox};
 use crate::atoms::wires::{
     bow_down, set_rect, standing, styles as wstyles, wires_down, Bow, IDLE,
 };
@@ -141,8 +142,8 @@ pub(crate) async fn run(
     let lbs = ctx.mutable_signal(OPENS_LBS as f64);
     let servers = ctx.mutable_signal(SERVERS as f64);
     let lifetime = ctx.mutable_signal(OPENS_LIFE_MS);
-    let served = ctx.mutable_signal(group(0));
-    let refused = ctx.mutable_signal(group(0));
+    let served = ctx.mutable_signal(count(0));
+    let refused = ctx.mutable_signal(count(0));
     let aggs = vec![("served", served.read()), ("retried", refused.read())];
 
     // Ten boxes always: the fleet is built once, and the slider decides who is in rotation.
@@ -213,7 +214,7 @@ pub(crate) async fn run(
                 let counts = lb_counts[i].read();
                 let text = {
                     let counts = counts.clone();
-                    ctx.computed(move |cx| group(get(&counts.get(cx)))).read()
+                    ctx.computed(move |cx| count(get(&counts.get(cx)))).read()
                 };
                 let zero = ctx.computed(move |cx| get(&counts.get(cx)) == 0).read();
                 (text, zero)
@@ -426,8 +427,8 @@ pub(crate) async fn run(
                     signal.set(&turn, (lb.clients, lb.inflight));
                 }
                 let answered = engine.answered();
-                served.set(&turn, group(answered.trips));
-                refused.set(&turn, group(answered.refusals));
+                served.set(&turn, count(answered.trips));
+                refused.set(&turn, count(answered.refusals));
 
                 // The crowd's heartbeat: orange while owed.
                 ink_frame(&turn, &mut faces, &ink_signals, &engine.outstanding());
@@ -599,8 +600,8 @@ fn strip_rows(samples: &VecDeque<Sample>, metric: usize, axis: f64) -> Vec<Strip
                 .collect::<Vec<_>>()
                 .join(" ");
             let reading = match samples.back() {
-                Some(s) => format!("{:.0} ms", s.of(metric)[row]),
-                None => "– ms".to_string(),
+                Some(s) => format!("{} ms", slots(format!("{:.0}", s.of(metric)[row]), 4)),
+                None => format!("{} ms", slots("–", 4)),
             };
             StripRow { label, points, reading, ink: ramp(pc) }
         })
@@ -608,11 +609,11 @@ fn strip_rows(samples: &VecDeque<Sample>, metric: usize, axis: f64) -> Vec<Strip
 }
 
 fn fmt_count(v: f64) -> String {
-    format!("{v:.0}")
+    slots(format!("{v:.0}"), 4)
 }
 
 fn fmt_life(v: f64) -> String {
-    format!("{:.1} s", v / 1000.0)
+    format!("{} s", slots(format!("{:.1}", v / 1000.0), 4))
 }
 
 #[styles]

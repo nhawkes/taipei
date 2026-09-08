@@ -17,6 +17,7 @@ use std::time::Duration;
 use idyll::{live_view, Ctx, Rect, Setup, Signal};
 use idyll_styles::styles;
 
+use crate::atoms::figure::slots;
 use crate::atoms::controls::styles as cstyles;
 use crate::atoms::framed::Framed;
 use crate::atoms::invite::Invite;
@@ -645,7 +646,7 @@ impl Panel {
                         ),
                         bar_pct: (100.0 * held / METER_FULL_US).min(100.0),
                         tick: match self.shut_now {
-                            true => format!("+{:.0}µs (1/{n})", us(self.charge)),
+                            true => format!("+{}µs (1/{n})", slots(format!("{:.0}", us(self.charge)), 4)),
                             false => "no queue — paused".to_string(),
                         },
                         accrued: grouped(held),
@@ -672,7 +673,7 @@ impl Panel {
                 key: k,
                 color: tenant_paint(k),
                 id: TENANTS[k].id,
-                total: format!("{} µs", grouped(us(self.fares[k]))),
+                total: format!("{} µs", slots(grouped(us(self.fares[k])), 7)),
             })
             .collect();
 
@@ -686,14 +687,14 @@ impl Panel {
             meters,
             long_lines,
             long_totals,
-            long_peak: format!("axis 0 → 1.00 · window peak {peak:.2}"),
+            long_peak: format!("axis 0 → 1.00 · window peak {}", slots(format!("{peak:.2}"), 4)),
             long_window_text: format!("{:.1} s", LONG_SAMPLE_MS * LONG_BARS as f64 / 1000.0),
             long_rate_text: format!(
-                "{:.2} µs per µs of wall clock",
-                self.long.back().map_or(0.0, |p| p.tot)
+                "{} µs per µs of wall clock",
+                slots(format!("{:.2}", self.long.back().map_or(0.0, |p| p.tot)), 5)
             ),
             long_fill_text: match span < LONG_BARS {
-                true => format!("filling — {:.1} s so far", span as f64 * LONG_SAMPLE_MS / 1000.0),
+                true => format!("filling — {} s so far", slots(format!("{:.1}", span as f64 * LONG_SAMPLE_MS / 1000.0), 4)),
                 false => "full".to_string(),
             },
             queueing_text: if self.shut_now { "queueing" } else { "no queue" },
@@ -702,14 +703,14 @@ impl Panel {
                 false => format!("font-weight:600;color:{}", crate::styles::Palette::ink_faint.value()),
             },
             product_text: match (self.shut_now, occupancy) {
-                (true, 0) | (false, _) => format!("{} × {occupancy} → nothing minted", u8::from(self.shut_now)),
-                (true, _) => format!("1 × {occupancy} → {:.0} µs each per slice", us(self.charge)),
+                (true, 0) | (false, _) => format!("{} × {occupancy} → {}", u8::from(self.shut_now), slots("nothing minted", 22)),
+                (true, _) => format!("1 × {occupancy} → {} µs each per slice", slots(format!("{:.0}", us(self.charge)), 4)),
             },
-            unattributed_text: grouped(us(self.unattributed)),
-            inflight: occupancy.to_string(),
+            unattributed_text: slots(grouped(us(self.unattributed)), 7),
+            inflight: slots(occupancy, 2),
             gate_label: if self.shut_now { "shut" } else { "open" },
-            rate_text: grouped(us(self.meter)),
-            clock_text: format!("{now:.0} ms"),
+            rate_text: slots(grouped(us(self.meter)), 7),
+            clock_text: format!("{} ms", slots(format!("{now:.0}"), 5)),
         }
     }
 }

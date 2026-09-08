@@ -93,6 +93,7 @@ pub mod styles {
         font_family: Face::sans,
         font_size: "1.0625rem",
         line_height: 1.65,
+        font_variant_numeric: "tabular-nums",
         color: Palette::ink,
         background: Palette::page,
         mobile: {

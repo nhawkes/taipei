@@ -18,6 +18,7 @@ use std::rc::Rc;
 
 use idyll::{live_view, Ctx, Setup, Signal};
 use idyll_styles::styles;
+use crate::atoms::figure::slots;
 use crate::atoms::cut::styles as cut_styles;
 
 use crate::atoms::button::styles as bstyles;
@@ -233,7 +234,7 @@ pub(crate) async fn run(
         let counted = counted.read();
         ctx.computed(move |cx| {
             let b = counted.get(cx);
-            format!("{} clients · {} servers · {} requests", b.clients, b.servers, b.requests())
+            format!("{} clients · {} servers · {} requests", slots(b.clients, 3), slots(b.servers, 3), slots(b.requests(), 4))
         })
         .read()
     };
@@ -499,7 +500,7 @@ impl Readouts {
             turn,
             match &machine.engine {
                 None => String::from(AT_REST),
-                Some(_) => format!("{} / {} clients", home.len(), batch.clients),
+                Some(_) => format!("{} / {} clients", slots(home.len(), 3), batch.clients),
             },
         );
         for ((ring, painted), next) in

@@ -12,6 +12,7 @@
 use idyll::{live_view, Ctx, Never, Setup, Signal};
 use idyll_styles::styles;
 
+use crate::atoms::figure::slots;
 use crate::atoms::stage::{Paint, Stage};
 
 /// One phase of the trip. Milliseconds — the atom scales them against `axis`.
@@ -134,8 +135,8 @@ fn label(r: &Placed) -> String {
 
 fn reading(r: &Placed) -> String {
     match r.leg.ms {
-        Some(ms) => format!("{} ms", ms.round() as i64),
-        None => "– ms".to_string(),
+        Some(ms) => format!("{} ms", slots(ms.round() as i64, 4)),
+        None => format!("{} ms", slots("–", 4)),
     }
 }
 
@@ -144,7 +145,7 @@ fn reading(r: &Placed) -> String {
 fn against(r: &Placed) -> String {
     match r.leg.against {
         Some(Against::Baseline) => "baseline".to_string(),
-        Some(Against::By(pc)) => format!("{pc:+.0}%"),
+        Some(Against::By(pc)) => format!("{}%", slots(format!("{pc:+.0}"), 4)),
         None => String::new(),
     }
 }
@@ -162,8 +163,8 @@ fn gain(r: &Placed) -> String {
 
 fn total_reading(trip: &f64) -> String {
     match *trip > 0.0 {
-        true => format!("{} ms", trip.round() as i64),
-        false => "– ms".to_string(),
+        true => format!("{} ms", slots(trip.round() as i64, 4)),
+        false => format!("{} ms", slots("–", 4)),
     }
 }
 

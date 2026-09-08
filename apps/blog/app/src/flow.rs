@@ -21,11 +21,12 @@ use std::collections::VecDeque;
 use idyll::{live_view, Ctx, MutableVec, Rect, Setup, Shape, Signal};
 use idyll_styles::styles;
 
+use crate::atoms::figure::{count, slots};
 use crate::atoms::button::styles as bstyles;
 use crate::atoms::client_strip::{ink, ink_frame, ClientStrip};
 use crate::atoms::lanes::{Ink, LaneTier, WIRES};
 use crate::atoms::legend::{Key, Legend};
-use crate::atoms::server_box::{group, server_name, ServerBox};
+use crate::atoms::server_box::{server_name, ServerBox};
 use crate::atoms::sim_card::{styles as card, SimHeader};
 use crate::atoms::cut::{at_rest, cut_label, ink_of, styles as cut_styles, CUT_SCALE};
 use crate::atoms::slider::{fmt_speed, raw_from_speed, speed_from_raw, Name, Scale, Slider};
@@ -185,8 +186,8 @@ pub(crate) async fn run(
     };
 
     let qps = ctx.mutable_signal(OPENS_AT);
-    let served = ctx.mutable_signal(group(0));
-    let refused = ctx.mutable_signal(group(0));
+    let served = ctx.mutable_signal(count(0));
+    let refused = ctx.mutable_signal(count(0));
     let aggs = vec![("served", served.read()), ("retried", refused.read())];
 
     // The crowd itself, one circle each: orange while a client is owed an answer. Above the
@@ -562,8 +563,8 @@ pub(crate) async fn run(
                 spread.set(&turn, spread_text_of(&loads));
 
                 let answered = engine.answered();
-                served.set(&turn, group(answered.trips));
-                refused.set(&turn, group(answered.refusals));
+                served.set(&turn, count(answered.trips));
+                refused.set(&turn, count(answered.refusals));
                 ink_frame(&turn, &mut faces, &ink_signals, &engine.outstanding());
 
                 // The frame's departures become pulses: a send in teal, an answer home in
@@ -879,17 +880,17 @@ fn against(column: usize, ms: f64, baseline: Option<f64>) -> Option<Against> {
 /// about — a machine with nothing on it, where the ratio is not a number at all.
 fn spread_text_of(loads: &[usize]) -> String {
     match (loads.iter().max(), loads.iter().min()) {
-        (Some(&most), Some(&least)) => format!("{most} over {least}"),
+        (Some(&most), Some(&least)) => format!("{} over {}", slots(most, 3), slots(least, 3)),
         _ => "—".to_string(),
     }
 }
 
 fn fmt_qps(v: f64) -> String {
-    format!("{v:.0}/s")
+    format!("{}/s", slots(format!("{v:.0}"), 4))
 }
 
 fn fmt_pool(v: f64) -> String {
-    format!("{v:.0} of {SERVERS}")
+    format!("{} of {SERVERS}", slots(format!("{v:.0}"), 2))
 }
 
 /// What the phone's column says with nothing to show. It mirrors whichever policy the pill has

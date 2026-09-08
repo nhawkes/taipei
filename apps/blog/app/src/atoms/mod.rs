@@ -8,6 +8,7 @@ pub mod code;
 pub mod content;
 pub mod controls;
 pub mod cut;
+pub mod figure;
 pub mod framed;
 pub mod invite;
 pub mod lanes;

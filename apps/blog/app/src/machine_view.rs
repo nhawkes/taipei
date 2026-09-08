@@ -12,6 +12,7 @@ use idyll::{live_view, Callback, Ctx, Event, Never, Setup, Signal};
 use std::rc::Rc;
 
 use crate::atoms::controls::styles as cstyles;
+use crate::atoms::figure::slots;
 use crate::atoms::stage::{Paint, Stage as Ink};
 use crate::engine::{CpuTask, Obs, Outcome, SparkPoint, Station, CORES};
 use crate::simview::*;
@@ -1048,19 +1049,19 @@ pub async fn MachineView(
     // Readouts, styles and the swarm — each a memo over the frame, so it rewrites the
     // DOM only when its own value moves.
     // One reading, not a name and a number that happen to sit beside each other.
-    let arrived = memo(&ctx, &frame, |f| format!("{} arrived", f.arrived));
+    let arrived = memo(&ctx, &frame, |f| format!("{} arrived", slots(f.arrived, 4)));
     let queue_n = memo(&ctx, &frame, |f| f.queue_len.to_string());
     let queue_line_sty = memo2(&ctx, &frame, &layout, |f, l| {
         lab_bold(l, QTAIL + 18.0, QTX_TOP_Y - 20.0, 13, if f.head_wait > 200.0 { RED } else { AMBER })
     });
-    let head_wait = memo(&ctx, &frame, |f| format!("head wait {:.0} ms", f.head_wait));
+    let head_wait = memo(&ctx, &frame, |f| format!("head wait {} ms", slots(format!("{:.0}", f.head_wait), 4)));
     // The queue's own gauge already says how long the head has waited by where its dot
     // stands on the conveyor, so on a narrow stage this reading gives up its space.
     let head_wait_sty = memo2(&ctx, &frame, &layout, |f, l| {
         let base = lab(l, QTAIL + 24.0, QTX_TOP_Y + 30.0, 11, if f.head_wait > 900.0 { RED } else { MUTED });
         if l.narrow() { format!("{base};display:none") } else { base }
     });
-    let more = memo(&ctx, &frame, |f| if f.more > 0 { format!("… +{} more", f.more) } else { String::new() });
+    let more = memo(&ctx, &frame, |f| if f.more > 0 { format!("… +{} more", slots(f.more, 3)) } else { String::new() });
     // The elided tail's count. On a narrow stage the gate's own readings have wrapped
     // into this space and the queue's total is already stated above the pipe, so this
     // one gives up its room rather than sit on top of them.
@@ -1099,7 +1100,7 @@ pub async fn MachineView(
     // The one row that reports rather than labels an exit: it sits below the last pipe
     // instead of above it, which is its own slot.
     let row_flight = memo(&ctx, &layout, |l| row_c(l, ROW_IN_FLIGHT));
-    let cpu_lbl = memo(&ctx, &frame, |f| format!("CPU · busy {}/{CORES} ({}%)", f.busy, f.util_pct));
+    let cpu_lbl = memo(&ctx, &frame, |f| format!("CPU · busy {}/{CORES} ({}%)", f.busy, slots(f.util_pct, 3)));
     let cpu_lbl_sty = memo2(&ctx, &frame, &layout, |f, l| {
         let col = if f.util_pct > 100 { RED } else if f.util_pct >= 50 { AMBER } else { BLUE };
         let base = lab_bold(l, CPU_X + 78.0, CPU_Y - 8.0, 12, col);
@@ -1111,28 +1112,28 @@ pub async fn MachineView(
             None => base,
         }
     });
-    let offered = memo(&ctx, &frame, |f| format!("{:.1}/s", f.offered));
-    let shed_n = memo(&ctx, &frame, |f| f.shed_n.to_string());
-    let gput = memo(&ctx, &frame, |f| format!("{:.1}/s", f.gput));
-    let succ_n = memo(&ctx, &frame, |f| f.succ_n.to_string());
-    let rtmo_n = memo(&ctx, &frame, |f| f.rtmo_n.to_string());
-    let ptmo_n = memo(&ctx, &frame, |f| f.ptmo_n.to_string());
-    let inflight = memo(&ctx, &frame, |f| f.inflight.to_string());
+    let offered = memo(&ctx, &frame, |f| format!("{}/s", slots(format!("{:.1}", f.offered), 5)));
+    let shed_n = memo(&ctx, &frame, |f| slots(f.shed_n, 4));
+    let gput = memo(&ctx, &frame, |f| format!("{}/s", slots(format!("{:.1}", f.gput), 5)));
+    let succ_n = memo(&ctx, &frame, |f| slots(f.succ_n, 4));
+    let rtmo_n = memo(&ctx, &frame, |f| slots(f.rtmo_n, 4));
+    let ptmo_n = memo(&ctx, &frame, |f| slots(f.ptmo_n, 4));
+    let inflight = memo(&ctx, &frame, |f| slots(f.inflight, 4));
     let last_lat = memo(&ctx, &frame, |f| match f.last_lat {
-        Some(l) => format!("{l:.0} ms"),
-        None => "— ms".to_string(),
+        Some(l) => format!("{} ms", slots(format!("{l:.0}"), 4)),
+        None => format!("{} ms", slots("—", 4)),
     });
     let last_lat_sty = memo(&ctx, &frame, |f| match f.last_lat {
         Some(l) => format!("color:{}", if l > 2000.0 { RED } else if l > 700.0 { AMBER } else { MUTED }),
         None => format!("color:{MUTED}"),
     });
-    let ready_n = memo(&ctx, &frame, |f| format!("{} ready", f.ready_n));
+    let ready_n = memo(&ctx, &frame, |f| format!("{} ready", slots(f.ready_n, 4)));
     let ready_n_sty = memo2(&ctx, &frame, &layout, |f, l| {
         let col = if f.ready_n == 0 { GREEN } else if f.ready_n < 10 { ORANGE } else { RED };
         lab_r(l, PIPE_RET - 18.0, 320.0, 11, col)
     });
-    let io_sleeping = memo(&ctx, &frame, |f| format!("{} sleeping", f.io_sleeping));
-    let syn_pending = memo(&ctx, &frame, |f| format!("{} pending", f.syn_pending));
+    let io_sleeping = memo(&ctx, &frame, |f| format!("{} sleeping", slots(f.io_sleeping, 4)));
+    let syn_pending = memo(&ctx, &frame, |f| format!("{} pending", slots(f.syn_pending, 4)));
 
     // The shutter covers the exit that is shut. Resting over the *entrance* is the
     // idle pose — nothing is being admitted or shed, so neither exit is claimed.
@@ -1152,8 +1153,8 @@ pub async fn MachineView(
     let gate_adm_lbl = memo(&ctx, &frame, |f| match (f.os_cpu_pct, f.limit) {
         // The delayed signal, shown live beside its threshold — watching this number
         // trail the instantaneous CPU readout is the OS-CPU tab's whole lesson.
-        (Some(pct), _) => format!("cpu avg {pct}% (<{:.0}%)", crate::engine::OS_CPU_MAX * 100.0),
-        (None, Some(n)) => format!("limit {n}"),
+        (Some(pct), _) => format!("cpu avg {}% (<{:.0}%)", slots(pct, 3), crate::engine::OS_CPU_MAX * 100.0),
+        (None, Some(n)) => format!("limit {}", slots(n, 3)),
         (None, None) => "< 50%".to_string(),
     });
     // Each gate reading washes to full only while its own exit is the open one, and

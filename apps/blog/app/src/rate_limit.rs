@@ -20,6 +20,7 @@ use std::time::Duration;
 use idyll::{live_view, Ctx, Rect, Setup, Signal};
 use idyll_styles::styles;
 
+use crate::atoms::figure::slots;
 use crate::atoms::button::{Button, ButtonKind};
 use crate::atoms::controls::styles as cstyles;
 use crate::atoms::invite::Invite;
@@ -125,15 +126,15 @@ const PRIORITY_SCALE: Scale = Scale::new(0, 100, 1);
 const BUDGET_SCALE: Scale = Scale::new(0, 200, 5);
 
 fn fmt_qps(v: f64) -> String {
-    format!("{v:.0}/s")
+    format!("{}/s", slots(format!("{v:.0}"), 4))
 }
 
 fn fmt_ms(v: f64) -> String {
-    format!("{v:.0} ms")
+    format!("{} ms", slots(format!("{v:.0}"), 4))
 }
 
 fn fmt_weight(v: f64) -> String {
-    format!("{v:.0}")
+    slots(format!("{v:.0}"), 3)
 }
 
 /// A duration as the tables read it — milliseconds to one place, because a budget of 50 ms
@@ -141,11 +142,11 @@ fn fmt_weight(v: f64) -> String {
 /// A reading in milliseconds, bare. The unit is the column's, named once in its heading —
 /// a unit repeated down every row is the widest thing in a column that has no room for it.
 fn ms(d: Duration) -> String {
-    format!("{:.1}", d.as_secs_f64() * 1000.0)
+    slots(format!("{:.1}", d.as_secs_f64() * 1000.0), 5)
 }
 
 fn pct(v: f64) -> String {
-    format!("{:.0}%", v * 100.0)
+    format!("{}%", slots(format!("{:.0}", v * 100.0), 3))
 }
 
 fn fmt_speed(raw: f64) -> String {
@@ -350,7 +351,7 @@ pub(crate) async fn run(
     let epoch_no = ctx.mutable_signal(0u64);
     let epoch_text = {
         let epoch_no = epoch_no.read();
-        ctx.computed(move |cx| format!("{}s", epoch_no.get(cx))).read()
+        ctx.computed(move |cx| format!("{}s", slots(epoch_no.get(cx), 3))).read()
     };
     let budget = ctx.mutable_signal(DEFAULT_BUDGET.as_secs_f64() * 1000.0);
 
