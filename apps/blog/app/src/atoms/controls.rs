@@ -86,20 +86,15 @@ pub mod styles {
         }
     }
 
-    /// The sim's outer block. It breaks out of the page's measure by a fixed margin —
-    /// enough that the stage reads as its own object, not so much that it becomes a
-    /// second width — and gives the breakout up when the viewport can't hold it. This
-    /// is also the box `ctx.resizes` measures.
+    /// The sim's outer block: the page's measure, exactly — a stage is read in the same
+    /// column as the prose around it, and the prose resumes a paragraph's space below
+    /// it. This is also the box `ctx.resizes` measures.
     pub const QV: Style = css! {{
         font_family: Face::sans,
         font_size: "13px",
         color: Palette::ink_muted,
-        width: "1000px",
-        margin_left: calc((100% - 1000px) / 2),
-        max_width(1063px): {
-            width: "100%",
-            margin_left: "0",
-        },
+        width: "100%",
+        margin: "0 0 28px",
     }};
 
     /// The stage: every moving part is a child positioned in stage coordinates, which
@@ -147,12 +142,8 @@ pub mod styles {
     }};
 
     /// The policy pill and the composition it names, above the machine they describe.
-    /// It stays on the **reading's** measure while the stage breaks out past it: a
-    /// switch and a code listing are things you read, and text set wider than the prose
-    /// around it reads as a different document.
     pub const POLICY: Style = css! {{
-        margin: "0 auto 18px",
-        max_width: "900px",
+        margin: "0 0 18px",
     }};
 
     /// The composition the chosen policy produces. It cross-fades rather than
