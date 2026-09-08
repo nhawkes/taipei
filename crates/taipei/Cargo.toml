@@ -1,0 +1,20 @@
+[package]
+name = "taipei"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["tokio"]
+tokio = ["tokio/rt-multi-thread"]
+# Drive the queue's deadlines from the pluggable `clock` module on every target
+# (wasm32 always does). For simulations and tests that advance time by hand.
+virtual-clock = []
+
+[dependencies]
+delegate = "0.13"
+tower = { version = "0.5", features = ["util"] }
+pin-project-lite = "0.2"
+pin-project = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
+tokio-util = { version = "0.7", features = ["rt"] }

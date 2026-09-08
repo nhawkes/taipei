@@ -1,0 +1,22 @@
+[package]
+name = "blog-server"
+version = "0.1.0"
+edition = "2021"
+description = "The blog's server — a thin main over idyll-serve: data and infra only, with the route resolver returning a pure-data page the `blog-app` UI is mounted against."
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+idyll-serve = { git = "https://github.com/nhawkes/idyll", rev = "fbe74cf559fe1cd58b3b686bcb50020b9502a9ea" }
+idyll-data = { git = "https://github.com/nhawkes/idyll", rev = "fbe74cf559fe1cd58b3b686bcb50020b9502a9ea", default-features = false }
+blog-app = { path = "../app" }
+blog-core = { path = "../../../crates/blog-core" }
+blog-fonts = { path = "../../../crates/blog-fonts" }
+idyll-route = { git = "https://github.com/nhawkes/idyll", rev = "fbe74cf559fe1cd58b3b686bcb50020b9502a9ea" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+notify = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

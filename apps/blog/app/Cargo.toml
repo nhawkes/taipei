@@ -1,0 +1,34 @@
+[package]
+name = "blog-app"
+version = "0.1.0"
+edition = "2021"
+description = "The blog's island table — the `sim` island (DOM simulations, including the real-taipei queue visualiser), its fragments, and the route query they compose into."
+
+[lib]
+# rlib: the native server links it (the route query artifact) and tests drive it.
+# cdylib: one `wasm32-wasip2` component (the `idyll:ssr` `app` world: islands + mount +
+# dispatch + deliver) — mounted by the server membrane AND jco-transpiled for the browser.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+idyll = { git = "https://github.com/nhawkes/idyll", rev = "fbe74cf559fe1cd58b3b686bcb50020b9502a9ea" }
+idyll-data = { git = "https://github.com/nhawkes/idyll", rev = "fbe74cf559fe1cd58b3b686bcb50020b9502a9ea", default-features = false }
+idyll-styles = { git = "https://github.com/nhawkes/idyll", rev = "fbe74cf559fe1cd58b3b686bcb50020b9502a9ea" }
+blog-core = { path = "../../../crates/blog-core", default-features = false }
+idyll-route = { git = "https://github.com/nhawkes/idyll", rev = "fbe74cf559fe1cd58b3b686bcb50020b9502a9ea" }
+serde = { workspace = true }
+
+# The queue visualiser runs the REAL taipei middleware inside the island: a tokio
+# current-thread runtime pumped per frame against a virtual clock. Deliberately NOT the
+# workspace tokio (features = ["full"] pulls net/signal, which don't build on wasm).
+taipei = { path = "../../../crates/taipei", default-features = false, features = ["virtual-clock"] }
+taipei-macros = { path = "../../../crates/taipei-macros" }
+tokio = { version = "1", default-features = false, features = ["rt", "sync", "macros"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+thiserror = "2"
+tower = { version = "0.5", features = ["util"] }
+
+# The wasm build uses only `wit-bindgen` — the app exposes a WIT interface and imports
+# WASI, nothing else. No wasm-bindgen / web-sys / JS bindings.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wit-bindgen = "0.51"

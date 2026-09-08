@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "crates/taipei",
+    "crates/taipei-macros",
+    "crates/blog-core",
+    "crates/blog-fonts",
+    "apps/blog/app",
+    "apps/blog/server",
+]
+resolver = "2"
+
+# Dependencies carry no debuginfo — wasmtime/tokio with full debug produce rlibs so large
+# that linking exhausts the paging file on this box (os error 1455). Our own crates keep
+# full debug for a good dev experience.
+[profile.dev.package."*"]
+debug = false
+
+# Binaryen is C++ compiled by cc; at /Od its passes take minutes on a real module.
+[profile.dev.package.wasm-opt-sys]
+opt-level = 2
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+notify = "6"

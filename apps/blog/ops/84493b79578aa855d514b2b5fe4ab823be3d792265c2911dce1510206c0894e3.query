@@ -1,0 +1,79 @@
+{
+  "on": "Query",
+  "selection": [
+    {
+      "kind": "root",
+      "field": "route",
+      "args": [
+        "request"
+      ],
+      "list": false,
+      "frag": {
+        "on": "Page",
+        "selection": [
+          {
+            "kind": "list",
+            "edge": "code_tabs",
+            "frag": {
+              "on": "CodeGroup",
+              "selection": [
+                {
+                  "kind": "leaf",
+                  "field": "id"
+                },
+                {
+                  "kind": "list",
+                  "edge": "tabs",
+                  "frag": {
+                    "on": "CodeTab",
+                    "selection": [
+                      {
+                        "kind": "leaf",
+                        "field": "code"
+                      },
+                      {
+                        "kind": "leaf",
+                        "field": "label"
+                      },
+                      {
+                        "kind": "leaf",
+                        "field": "lang"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "leaf",
+            "field": "id"
+          },
+          {
+            "kind": "enum",
+            "field": "route",
+            "variants": [
+              {
+                "variant": "Article",
+                "selection": [
+                  {
+                    "kind": "leaf",
+                    "field": "body"
+                  }
+                ]
+              },
+              {
+                "variant": "Index",
+                "selection": []
+              }
+            ]
+          },
+          {
+            "kind": "leaf",
+            "field": "title"
+          }
+        ]
+      }
+    }
+  ]
+}

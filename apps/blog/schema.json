@@ -1,0 +1,140 @@
+{
+  "nodes": [
+    {
+      "name": "Page",
+      "fields": [
+        {
+          "name": "id",
+          "ty": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "title",
+          "ty": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "route",
+          "ty": {
+            "kind": "value",
+            "value": "Route"
+          }
+        },
+        {
+          "name": "code_tabs",
+          "ty": {
+            "kind": "list",
+            "of": {
+              "kind": "value",
+              "value": "CodeGroup"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "values": [
+    {
+      "name": "CodeGroup",
+      "fields": [
+        {
+          "name": "id",
+          "ty": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "tabs",
+          "ty": {
+            "kind": "list",
+            "of": {
+              "kind": "value",
+              "value": "CodeTab"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "CodeTab",
+      "fields": [
+        {
+          "name": "label",
+          "ty": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "lang",
+          "ty": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "code",
+          "ty": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Request",
+      "fields": [
+        {
+          "name": "path",
+          "ty": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "enums": [
+    {
+      "name": "Route",
+      "variants": [
+        {
+          "name": "Article",
+          "fields": [
+            {
+              "name": "body",
+              "ty": {
+                "kind": "content"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Index"
+        }
+      ]
+    }
+  ],
+  "roots": [
+    {
+      "name": "route",
+      "args": [
+        {
+          "name": "request",
+          "ty": {
+            "kind": "value",
+            "value": "Request"
+          }
+        }
+      ],
+      "output": "Page",
+      "list": false
+    }
+  ],
+  "mutations": []
+}

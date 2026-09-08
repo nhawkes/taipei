@@ -1,0 +1,6 @@
+[package]
+name = "blog-fonts"
+version = "0.1.0"
+edition = "2021"
+description = "The blog's web faces, bundled as OFL woff2 and served locally — cargo resolves the type, no Google Fonts CDN at runtime."
+license = "OFL-1.1"

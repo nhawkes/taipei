@@ -1,0 +1,9 @@
+target/
+static/wasm/
+static/fonts/
+static/fonts.css
+dist/
+.history/
+*.bak
+CLAUDE.md
+.claude/

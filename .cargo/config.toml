@@ -1,0 +1,3 @@
+[alias]
+site-build = "run --locked -p blog-server -- prerender"
+site-check = "test --workspace --locked"
