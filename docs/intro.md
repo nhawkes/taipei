@@ -25,6 +25,7 @@ fn main() -> anyhow::Result<()> {
         .service(my_service);
     let (service, worker) = QueueLayer::new(DEFAULT_TIMEOUT).build(inner, handle.clone());
 
+    // handle timeout in queue and other errors
     let service = Shared::new(
         ServiceBuilder::new()
             .layer(HandleErrorLayer::new(|e: QueueError| async move {
