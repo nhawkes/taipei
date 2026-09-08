@@ -572,7 +572,7 @@ impl<'a> IrBuilder<'a> {
         vec![Nested::Element {
             tag: "div".to_string(),
             attrs: self.styled(&self.mapping.error),
-            children: vec![Nested::Text("Error occured while loading".to_string())],
+            children: vec![Nested::Text("Error occurred while loading".to_string())],
         }]
     }
 

@@ -1,6 +1,6 @@
 # What is taipei
 
-Taipei is a Rust library that works with tower crate to provide a set of building blocks for building reliable and optimal servers
+Taipei is a Rust library that works with the tower crate to provide a set of building blocks for building reliable and optimal servers.
 
 Here is a full example of a reliable server:
 ```rust
@@ -52,4 +52,4 @@ And a full visualization
 { "sim": "queue-viz", "width": 960, "height": 520, "stage": "queue" }
 ```
 
-We'll walkthrough why each component exists step-by-step
+We'll walk through why each component exists step-by-step.

@@ -75,7 +75,7 @@ fn adjacent_tab_fences_become_one_keyed_live() {
         out,
         "<p>before</p>\
          <idyll-live data-i=\"code-tabs\" data-k=\"code-0\" style=\"display:contents\">\
-         <div class=\"idbf2ca32-error-color\">Error occured while loading</div>\
+         <div class=\"idbf2ca32-error-color\">Error occurred while loading</div>\
          </idyll-live>\
          <p>after</p>"
     );
