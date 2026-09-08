@@ -19,6 +19,7 @@ pub async fn page(ctx: Ctx<Setup, Never>, seed: PageSeed) -> idyll::Result {
     let content = match live.at_mount(&ctx).route {
         PageFragRoute::Article { body } => article(body),
         PageFragRoute::Index {} => index(),
+        PageFragRoute::NotFound {} => not_found(),
     };
     Ok(ctx.render_content(view! {
         div css=[styles::PAGE] {
@@ -62,6 +63,10 @@ fn article(body: View) -> View {
             @content(body)
         }
     }
+}
+
+fn not_found() -> View {
+    heading(HeadingLevel::Title, "This page does not exist")
 }
 
 /// The front page's body: the book's table of contents, static — `blog_core::BOOK`

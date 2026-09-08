@@ -51,7 +51,7 @@ pub mod styles;
 // the marker in the prose carries the group's id, and the island reads it back.
 fragment! { CodeTabFrag on CodeTab { label, lang, code } }
 fragment! { CodeGroupFrag on CodeGroup { id, tabs: [CodeTabFrag] } }
-fragment! { PageFrag on Page { id, title, code_tabs: [CodeGroupFrag], route { Article { body }, Index {} } } }
+fragment! { PageFrag on Page { id, title, code_tabs: [CodeGroupFrag], route { Article { body }, Index {}, NotFound {} } } }
 
 // **The route query** — the one persisted operation; the server imports
 // `RouteQuery::query_file()`.

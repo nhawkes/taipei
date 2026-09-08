@@ -116,6 +116,9 @@
         },
         {
           "name": "Index"
+        },
+        {
+          "name": "NotFound"
         }
       ]
     }

@@ -42,6 +42,8 @@ pub const BOOK: &[BookChapter] = &[
 pub enum BlogRoute {
     #[route("/")]
     Index,
+    #[route("/404")]
+    NotFound,
     #[route("/{slug}")]
     Doc { slug: String },
 }

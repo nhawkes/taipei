@@ -65,6 +65,10 @@
               {
                 "variant": "Index",
                 "selection": []
+              },
+              {
+                "variant": "NotFound",
+                "selection": []
               }
             ]
           },

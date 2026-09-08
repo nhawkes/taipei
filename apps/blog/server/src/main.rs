@@ -62,6 +62,7 @@ pub struct CodeGroup {
 pub enum Route {
     Article { body: idyll_data::Content },
     Index,
+    NotFound,
 }
 
 /// The route root's output — the framework contract (`id` = the request path,
@@ -136,6 +137,12 @@ async fn route(db: &Db, request: Request) -> Result<Option<Page>, std::convert::
         Some(blog_core::BlogRoute::Doc { slug }) => {
             content.doc(&slug).map(|doc| article(path, &doc.title, &doc.markdown))
         }
+        Some(blog_core::BlogRoute::NotFound) => Some(Page {
+            id: path.to_string(),
+            title: "This page does not exist".to_string(),
+            route: Route::NotFound,
+            code_tabs: Vec::new(),
+        }),
         None => None,
     };
     Ok(resolved)
@@ -268,6 +275,7 @@ async fn main() -> anyhow::Result<()> {
         .mode(mode)
         .port(port)
         .assets("static") // favicon.svg and the sim bundles; the styles are typed
+        .not_found(blog_core::BlogRoute::NotFound)
         .build();
 
     match command {
