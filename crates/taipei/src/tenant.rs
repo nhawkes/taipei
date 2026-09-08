@@ -237,7 +237,7 @@ impl Accumulator {
 /// One occupier's bill. It draws its share of the shared rate after each poll of its future, and on
 /// the first of (its future resolves) or (its future is dropped / cancelled) reports the total to
 /// its tenant exactly once and leaves the occupier set.
-pub struct Blame<R: Fn(&str, Duration)> {
+pub struct Blame<R: Report> {
     acc: Arc<Accumulator>,
     report: R,
     tenant: String,
@@ -249,7 +249,7 @@ pub struct Blame<R: Fn(&str, Duration)> {
     reported: bool,
 }
 
-impl<R: Fn(&str, Duration)> Blame<R> {
+impl<R: Report> Blame<R> {
     /// Take the share minted since the last draw. The subtraction is exact — all the rounding
     /// happened in [`Accumulator::accrue`] — so drawing on every poll bills exactly what drawing
     /// once at exit would.
@@ -275,11 +275,11 @@ impl<R: Fn(&str, Duration)> Blame<R> {
         // includes this request, and the draw that follows takes the share that flush just minted.
         self.acc.leave();
         self.draw();
-        (self.report)(&self.tenant, self.owed);
+        self.report.report(&self.tenant, self.owed);
     }
 }
 
-impl<R: Fn(&str, Duration)> Drop for Blame<R> {
+impl<R: Report> Drop for Blame<R> {
     fn drop(&mut self) {
         self.finalize();
     }
@@ -287,42 +287,57 @@ impl<R: Fn(&str, Duration)> Drop for Blame<R> {
 
 // ── the public handle ──────────────────────────────────────────────────────────
 
-/// Shares one [`Accumulator`]; mint layers or admit requests directly. Clones share the accounting.
-#[derive(Clone)]
-pub struct TenantReporter(Arc<Accumulator>);
+/// Where a finished request's blame goes: called once per request with the tenant and what it
+/// owes, from the [`Blame`] handle's `Drop` — which can run mid-unwind on a cancelled or panicking
+/// request — so it must not itself panic (a bare per-tenant write). A closure `Fn(&str, Duration)`
+/// is one; a named type is another, for a caller that has to write the reporter's type down.
+pub trait Report: Clone {
+    fn report(&self, tenant: &str, blame: Duration);
+}
 
-impl Default for TenantReporter {
-    fn default() -> Self {
-        Self::new()
+impl<F: Fn(&str, Duration) + Clone> Report for F {
+    fn report(&self, tenant: &str, blame: Duration) {
+        self(tenant, blame)
     }
 }
 
-impl TenantReporter {
+/// One server's meter and the sink its blame reports to. It is the tower [`Layer`] itself —
+/// `ServiceBuilder::new().layer(&reporter)` — and clones share the accounting.
+#[derive(Clone)]
+pub struct TenantReporter<R: Report> {
+    acc: Arc<Accumulator>,
+    report: R,
+}
+
+#[bon::bon]
+impl<R: Report> TenantReporter<R> {
     /// Time is read from the ambient monotonic clock ([`Instant::now`]); `epoch` fixes the zero the
     /// counters measure from, so on `virtual-clock`/wasm this must be constructed within a
     /// `crate::clock::Clock::enter` scope, exactly as the queue expects.
-    pub fn new() -> Self {
+    #[builder]
+    pub fn new(report: R) -> Self {
         let epoch = Instant::now();
-        TenantReporter(Arc::new(Accumulator {
-            rate: AtomicU64::new(0),
-            inflight: AtomicU64::new(0),
-            accumulated: AtomicU64::new(0),
-            attributed: AtomicU64::new(0),
-            unattributed: AtomicU64::new(0),
-            gate: AtomicU64::new(Gate::Open.encode()),
-            epoch,
-        }))
+        TenantReporter {
+            acc: Arc::new(Accumulator {
+                rate: AtomicU64::new(0),
+                inflight: AtomicU64::new(0),
+                accumulated: AtomicU64::new(0),
+                attributed: AtomicU64::new(0),
+                unattributed: AtomicU64::new(0),
+                gate: AtomicU64::new(Gate::Open.encode()),
+                epoch,
+            }),
+            report,
+        }
     }
 
-    /// A [`Blame`] handle for a request entering the occupier set — the direct path the
-    /// [`TenantReportLayer`] uses, and the one a test or a hand-built stack can drive. `report`
-    /// fires once at completion, from the handle's `Drop` — which can run mid-unwind on a
-    /// cancelled or panicking request — so it must not itself panic (a bare per-tenant write).
-    pub fn admit<R: Fn(&str, Duration)>(&self, tenant: impl Into<String>, report: R) -> Blame<R> {
-        let seen = self.0.enter();
+    /// A [`Blame`] handle for a request entering the occupier set — the direct path the layer
+    /// takes, and the one a test or a hand-built stack can drive.
+    pub fn admit(&self, tenant: impl Into<String>) -> Blame<R> {
+        let seen = self.acc.enter();
         Blame {
-            acc: Arc::clone(&self.0),
-            report,
+            acc: Arc::clone(&self.acc),
+            report: self.report.clone(),
             tenant: tenant.into(),
             seen,
             owed: Duration::ZERO,
@@ -330,16 +345,10 @@ impl TenantReporter {
         }
     }
 
-    /// A tower layer that admits every request under its `Req::tenant()` and reports the blame
-    /// through `report` when the request finishes.
-    pub fn layer<R: Fn(&str, Duration) + Clone>(&self, report: R) -> TenantReportLayer<R> {
-        TenantReportLayer { reporter: self.clone(), report }
-    }
-
     /// Whether the gate is shut right now — a caller has been told `Pending` and not yet admitted.
     /// Shut-time is minting for as long as this holds.
     pub fn shut(&self) -> bool {
-        matches!(Gate::decode(self.0.gate.load(Relaxed)), Gate::Shut { .. })
+        matches!(Gate::decode(self.acc.gate.load(Relaxed)), Gate::Shut { .. })
     }
 
     /// Bank the running shut span up to this instant, leaving it running.
@@ -352,64 +361,58 @@ impl TenantReporter {
     /// well before them. Settling at each observation makes the difference of two readings the
     /// shut-time that elapsed between them.
     pub fn settle(&self) {
-        self.0.flush(self.0.now());
+        self.acc.flush(self.acc.now());
     }
 
     /// Occupiers on the server right now — for the visualiser.
     pub fn inflight(&self) -> u64 {
-        self.0.inflight.load(Relaxed)
+        self.acc.inflight.load(Relaxed)
     }
 
     /// Measured shut-time that had an occupier to bill — the whole that drawn blame sums to.
     pub fn accumulated(&self) -> Duration {
-        Duration::from_nanos(self.0.accumulated.load(Relaxed))
+        Duration::from_nanos(self.acc.accumulated.load(Relaxed))
     }
 
     /// Blame drawn by occupiers so far. Never exceeds [`accumulated`](Self::accumulated); the slack
     /// is `dt / N`'s rounding.
     pub fn attributed(&self) -> Duration {
-        Duration::from_nanos(self.0.attributed.load(Relaxed))
+        Duration::from_nanos(self.acc.attributed.load(Relaxed))
     }
 
     /// Shut-time that elapsed with no occupier — time no request can be blamed for.
     pub fn unattributed(&self) -> Duration {
-        Duration::from_nanos(self.0.unattributed.load(Relaxed))
+        Duration::from_nanos(self.acc.unattributed.load(Relaxed))
     }
 
     /// The meter: what a request that had occupied the server for the whole run would owe. The
     /// visualiser draws this, and a request's fare is the difference across its residency.
     pub fn meter(&self) -> Duration {
-        Duration::from_nanos(self.0.rate.load(Relaxed))
+        Duration::from_nanos(self.acc.rate.load(Relaxed))
     }
 }
 
 // ── the tower layer ────────────────────────────────────────────────────────────
 
-#[derive(Clone)]
-pub struct TenantReportLayer<R> {
-    reporter: TenantReporter,
-    report: R,
-}
-
-impl<S, R: Clone> Layer<S> for TenantReportLayer<R> {
+/// Admits every request under its `Req::tenant()` and reports its blame when it finishes.
+impl<S, R: Report> Layer<S> for TenantReporter<R> {
     type Service = TenantReportService<S, R>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        TenantReportService { inner, reporter: self.reporter.clone(), report: self.report.clone() }
+        TenantReportService { inner, reporter: self.clone() }
     }
 }
 
 #[derive(Clone)]
-pub struct TenantReportService<S, R> {
+pub struct TenantReportService<S, R: Report> {
     inner: S,
-    reporter: TenantReporter,
-    report: R,
+    reporter: TenantReporter<R>,
 }
 
 impl<S, R, Req> Service<Req> for TenantReportService<S, R>
 where
     S: Service<Req>,
-    R: Fn(&str, Duration) + Clone,
+    R: Report,
     Req: Tenant,
 {
     type Response = S::Response;
@@ -419,7 +422,7 @@ where
     /// The gate, measured. One clock read stamps both the flush of the span so far and the edge the
     /// verdict below writes, so the two can never disagree about when this observation happened.
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let acc = &self.reporter.0;
+        let acc = &self.reporter.acc;
         let now = acc.now();
         acc.flush(now);
         let ready = self.inner.poll_ready(cx);
@@ -431,13 +434,13 @@ where
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
-        let blame = self.reporter.admit(req.tenant().to_owned(), self.report.clone());
+        let blame = self.reporter.admit(req.tenant().to_owned());
         ReportFuture { inner: self.inner.call(req), blame: Some(blame) }
     }
 }
 
 pin_project! {
-    pub struct ReportFuture<F, R: Fn(&str, Duration)> {
+    pub struct ReportFuture<F, R: Report> {
         #[pin]
         inner: F,
         // Reported when the response resolves (or the future is cancelled), whichever comes first.
@@ -445,7 +448,7 @@ pin_project! {
     }
 }
 
-impl<F: Future, R: Fn(&str, Duration)> Future for ReportFuture<F, R> {
+impl<F: Future, R: Report> Future for ReportFuture<F, R> {
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -474,6 +477,9 @@ mod tests {
     fn ledger() -> Ledger {
         Arc::new(Mutex::new(HashMap::new()))
     }
+
+    /// A sink for the tests that only read the meter.
+    fn quiet(_: &str, _: Duration) {}
 
     fn writer(ledger: &Ledger) -> impl Fn(&str, Duration) + Clone {
         let ledger = ledger.clone();
@@ -509,14 +515,14 @@ mod tests {
     #[cfg(not(any(target_arch = "wasm32", feature = "virtual-clock")))]
     #[test]
     fn shut_time_splits_evenly_and_conserves() {
-        let reporter = TenantReporter::new();
         let l = ledger();
-        let a = reporter.admit("a", writer(&l));
-        let b = reporter.admit("b", writer(&l));
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
+        let a = reporter.admit("a");
+        let b = reporter.admit("b");
 
         // Two occupiers present together; bank spans whose measured `dt` sums to 1500.
-        reporter.0.accrue(ns(1000));
-        reporter.0.accrue(ns(500));
+        reporter.acc.accrue(ns(1000));
+        reporter.acc.accrue(ns(500));
         drop(a);
         drop(b);
 
@@ -531,14 +537,14 @@ mod tests {
     #[cfg(not(any(target_arch = "wasm32", feature = "virtual-clock")))]
     #[test]
     fn membership_reweights_the_share() {
-        let reporter = TenantReporter::new();
         let l = ledger();
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
         // `a` alone: it owns the whole span.
-        let a = reporter.admit("a", writer(&l));
-        reporter.0.accrue(ns(100));
+        let a = reporter.admit("a");
+        reporter.acc.accrue(ns(100));
         // `b` joins; the next span is halved.
-        let b = reporter.admit("b", writer(&l));
-        reporter.0.accrue(ns(200));
+        let b = reporter.admit("b");
+        reporter.acc.accrue(ns(200));
         drop(a);
         drop(b);
 
@@ -554,12 +560,12 @@ mod tests {
         // A request polled on every span must be billed exactly what a request polled only at exit
         // is. Odd spans across two occupiers, so every flush leaves a rounding remainder for the
         // schedule to disagree over if a draw were anything but an exact subtraction.
-        let reporter = TenantReporter::new();
         let l = ledger();
-        let mut eager = reporter.admit("eager", writer(&l));
-        let lazy = reporter.admit("lazy", writer(&l));
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
+        let mut eager = reporter.admit("eager");
+        let lazy = reporter.admit("lazy");
         for _ in 0..4 {
-            reporter.0.accrue(ns(3));
+            reporter.acc.accrue(ns(3));
             eager.draw();
         }
         drop(eager);
@@ -576,12 +582,12 @@ mod tests {
     fn blame_survives_the_meter_rolling_over() {
         // A long-lived server's meter eventually rolls the u64. A request in flight across the roll
         // must still be billed the true delta — the whole reason a fare is read as a difference.
-        let reporter = TenantReporter::new();
         let l = ledger();
-        reporter.0.rate.store(u64::MAX - 2, Relaxed); // pin the meter just below the roll
-        reporter.0.accumulated.store(100, Relaxed); // give the clamp room; this isolates the roll
-        let r = reporter.admit("late", writer(&l)); // reads the meter at the brink
-        reporter.0.rate.fetch_add(5, Relaxed); // 5 nanos wind on, crossing the roll
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
+        reporter.acc.rate.store(u64::MAX - 2, Relaxed); // pin the meter just below the roll
+        reporter.acc.accumulated.store(100, Relaxed); // give the clamp room; this isolates the roll
+        let r = reporter.admit("late"); // reads the meter at the brink
+        reporter.acc.rate.fetch_add(5, Relaxed); // 5 nanos wind on, crossing the roll
         drop(r);
         // Wrapping delta recovers the 5 nanos; a saturating subtraction would have reported 0.
         assert_eq!(l.lock().unwrap().get("late").copied(), Some(ns(5)));
@@ -590,14 +596,14 @@ mod tests {
     #[cfg(not(any(target_arch = "wasm32", feature = "virtual-clock")))]
     #[test]
     fn attributed_never_exceeds_accumulated() {
-        let reporter = TenantReporter::new();
         let l = ledger();
-        let a = reporter.admit("a", writer(&l));
-        let b = reporter.admit("b", writer(&l));
-        reporter.0.accrue(ns(100)); // the whole measured is 100
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
+        let a = reporter.admit("a");
+        let b = reporter.admit("b");
+        reporter.acc.accrue(ns(100)); // the whole measured is 100
         // Force an over-draw: push `rate` so each request's raw share (1050) dwarfs the whole,
         // standing in for rounding slop that would otherwise bill past what was measured.
-        reporter.0.rate.fetch_add(1000, Relaxed);
+        reporter.acc.rate.fetch_add(1000, Relaxed);
         drop(a);
         drop(b);
 
@@ -682,10 +688,10 @@ mod tests {
         use gate::*;
         let clock = crate::clock::Clock::new();
         let _scope = clock.enter();
-        let reporter = TenantReporter::new();
         let l = ledger();
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
         let inner = Inner { clock: clock.clone(), ready: Arc::new(AtomicU64::new(1)), work: 500 };
-        let mut svc = reporter.layer(writer(&l)).layer(inner);
+        let mut svc = (&reporter).layer(inner);
 
         let mut cx = cx();
         assert!(svc.poll_ready(&mut cx).is_ready(), "the gate admits immediately");
@@ -704,11 +710,11 @@ mod tests {
         use gate::*;
         let clock = crate::clock::Clock::new();
         let _scope = clock.enter();
-        let reporter = TenantReporter::new();
         let l = ledger();
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
         let ready = Arc::new(AtomicU64::new(1));
         let inner = Inner { clock: clock.clone(), ready: ready.clone(), work: 0 };
-        let mut svc = reporter.layer(writer(&l)).layer(inner);
+        let mut svc = (&reporter).layer(inner);
         let mut cx = cx();
 
         // `hog` is admitted, then the gate shuts behind it.
@@ -742,20 +748,20 @@ mod tests {
         use gate::*;
         let clock = crate::clock::Clock::new();
         let _scope = clock.enter();
-        let reporter = TenantReporter::new();
         let l = ledger();
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
 
-        let a = reporter.admit("a", writer(&l));
+        let a = reporter.admit("a");
         // Shut the gate with `a` inside. `Inner` is not involved — this drives the accumulator the
         // way the layer's `poll_ready` does, without a second service to keep in step.
-        reporter.0.shut(reporter.0.now());
+        reporter.acc.shut(reporter.acc.now());
 
         advance(&clock, 10);
         drop(a); // leave flushes 10 µs at N = 1
         advance(&clock, 10); // 10 µs shut with nobody on the server
-        let b = reporter.admit("b", writer(&l)); // enter flushes it at N = 0
+        let b = reporter.admit("b"); // enter flushes it at N = 0
         advance(&clock, 10);
-        reporter.0.open(reporter.0.now()); // the gate admits; the last 10 µs bank at N = 1
+        reporter.acc.open(reporter.acc.now()); // the gate admits; the last 10 µs bank at N = 1
         drop(b);
 
         let m = l.lock().unwrap();
@@ -773,11 +779,11 @@ mod tests {
         use gate::*;
         let clock = crate::clock::Clock::new();
         let _scope = clock.enter();
-        let reporter = TenantReporter::new();
         let l = ledger();
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
 
-        let hog = reporter.admit("hog", writer(&l));
-        reporter.0.shut(reporter.0.now());
+        let hog = reporter.admit("hog");
+        reporter.acc.shut(reporter.acc.now());
         let mut seen = Vec::new();
         let mut last = reporter.meter();
         for _ in 0..3 {
@@ -799,8 +805,8 @@ mod tests {
         use gate::*;
         let clock = crate::clock::Clock::new();
         let _scope = clock.enter();
-        let reporter = TenantReporter::new();
         let l = ledger();
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
 
         // An inner that never resolves — the request is cancelled by dropping the future mid-flight.
         struct Pending;
@@ -816,7 +822,7 @@ mod tests {
             }
         }
 
-        let mut svc = reporter.layer(writer(&l)).layer(Pending);
+        let mut svc = (&reporter).layer(Pending);
         let mut cx = cx();
         assert!(svc.poll_ready(&mut cx).is_ready());
 
@@ -841,8 +847,8 @@ mod tests {
         use std::panic::{self, AssertUnwindSafe};
         let clock = crate::clock::Clock::new();
         let _scope = clock.enter();
-        let reporter = TenantReporter::new();
         let l = ledger();
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
 
         struct Boom;
         impl Service<Req> for Boom {
@@ -864,12 +870,12 @@ mod tests {
             }
         }
 
-        let mut svc = reporter.layer(writer(&l)).layer(Boom);
+        let mut svc = (&reporter).layer(Boom);
         let mut cx = cx();
         assert!(svc.poll_ready(&mut cx).is_ready());
         let mut fut = Box::pin(svc.call(Req("acme")));
         // The occupier holds the server shut for 250 µs before it unwinds.
-        reporter.0.shut(reporter.0.now());
+        reporter.acc.shut(reporter.acc.now());
         advance(&clock, 250);
 
         let default_hook = panic::take_hook();
@@ -896,18 +902,17 @@ mod tests {
     fn concurrent_churn_keeps_the_invariants() {
         use std::thread;
 
-        let reporter = TenantReporter::new();
         let l = ledger();
+        let reporter = TenantReporter::builder().report(writer(&l)).build();
 
         let threads: Vec<_> = (0..8)
             .map(|t| {
                 let reporter = reporter.clone();
-                let write = writer(&l);
                 thread::spawn(move || {
                     let tenant = format!("t{}", t % 3);
                     for _ in 0..10_000 {
-                        let handle = reporter.admit(tenant.clone(), write.clone());
-                        reporter.0.accrue(ns(1)); // exercise the rate/attribute path under contention
+                        let handle = reporter.admit(tenant.clone());
+                        reporter.acc.accrue(ns(1)); // exercise the rate/attribute path under contention
                         drop(handle);
                     }
                 })
@@ -932,17 +937,17 @@ mod tests {
     fn concurrent_flushes_bank_each_span_once() {
         use std::thread;
 
-        let reporter = TenantReporter::new();
-        let _occupier = reporter.admit("t", |_, _| {});
+        let reporter = TenantReporter::builder().report(quiet).build();
+        let _occupier = reporter.admit("t");
         // Every thread flushes the same running span at the same instant; the swap decides who owns
         // which segment, so the banked total is the span, not the span times the thread count.
-        reporter.0.gate.store(Gate::Shut { since: 0 }.encode(), Relaxed);
+        reporter.acc.gate.store(Gate::Shut { since: 0 }.encode(), Relaxed);
         let threads: Vec<_> = (0..8)
             .map(|_| {
                 let reporter = reporter.clone();
                 thread::spawn(move || {
                     for _ in 0..1_000 {
-                        reporter.0.flush(1_000_000);
+                        reporter.acc.flush(1_000_000);
                     }
                 })
             })

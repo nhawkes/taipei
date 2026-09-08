@@ -21,7 +21,7 @@ use taipei::limit::{ConcurrencyLimit, DynamicConcurrencyLimitLayer, DynamicConcu
 use taipei::queue::{QueueLayer, QueueService, QueueWorker};
 use taipei::rate_limit::{Limits, RateLimitLayer, RateLimitService};
 use taipei::reject::{RejectionLayer, RejectionService};
-use taipei::tenant::{TenantReportService, TenantReporter};
+use taipei::tenant::{Report, TenantReportService, TenantReporter};
 use tokio::runtime::Handle;
 use tower::{Layer, ServiceBuilder};
 
@@ -46,7 +46,7 @@ pub(crate) fn reject(
     app: App,
     limit: usize,
 ) -> RejectionService<DynamicConcurrencyLimitService<App>> {
-    // Shed immediately while every slot is taken — HTTP 529, safe to retry.
+    // Reject if too many requests
     ServiceBuilder::new()
         .layer(RejectionLayer::new())
         .layer(DynamicConcurrencyLimitLayer::new(limit))
@@ -63,7 +63,7 @@ pub(crate) fn wait(
     UnboundedQueueService<SimReq, ()>,
     UnboundedQueueWorker<DynamicConcurrencyLimitService<App>, SimReq, ()>,
 ) {
-    // No rejection layer: callers wait, unboundedly, for a free slot.
+    // Queue if too many requests
     let inner = ServiceBuilder::new()
         .layer(DynamicConcurrencyLimitLayer::new(limit))
         .service(app);
@@ -81,7 +81,7 @@ pub(crate) fn queue_naive(
     QueueService<SimReq, ()>,
     QueueWorker<DynamicConcurrencyLimitService<App>, SimReq, ()>,
 ) {
-    // Tuned by hand on an average workload; goes stale when the workload moves.
+    // A manually picked limit (tune below)
     let inner = ServiceBuilder::new()
         .layer(DynamicConcurrencyLimitLayer::new(limit))
         .service(app);
@@ -99,8 +99,7 @@ pub(crate) fn queue(
     QueueService<SimReq, ()>,
     QueueWorker<CpuBackpressureService<App>, SimReq, ()>,
 ) {
-    // Tokio reports thread start/stop as it happens: instantaneous availability.
-    // Admit while under half the cores are active.
+    // Queue until tokio has 50% of cores available
     let inner = ServiceBuilder::new()
         .layer(CpuBackpressureLayer::new(instr))
         .service(app);
@@ -113,18 +112,17 @@ pub(crate) fn queue(
 /// the shut-time, and the queue worker racing its deadline on `service.ready()` is the one caller
 /// the reporter is specified for.
 #[taipei_macros::shown(QUEUE_TENANT_SRC)]
-pub(crate) fn queue_tenant<R: Fn(&str, Duration) + Clone + Send + 'static>(
+pub(crate) fn queue_tenant<R: Report + Send + 'static>(
     app: App,
     instr: &RuntimeInstrumentation,
     handle: Handle,
     queue_timeout: Duration,
-    reporter: &TenantReporter,
-    report: R,
+    reporter: &TenantReporter<R>,
 ) -> (QueueService<SimReq, ()>, QueueWorker<TenantReportService<CpuBackpressureService<App>, R>, SimReq, ()>) {
     // Below the queue, so only admitted requests are occupiers — a waiter never pays. Above the
     // gate, so the shut-time it bills is the gate's own `Pending`.
     let inner = ServiceBuilder::new()
-        .layer(reporter.layer(report))
+        .layer(reporter)
         .layer(CpuBackpressureLayer::new(instr))
         .service(app);
     QueueLayer::new(queue_timeout).build(inner, handle)
@@ -132,8 +130,8 @@ pub(crate) fn queue_tenant<R: Fn(&str, Duration) + Clone + Send + 'static>(
 
 /// The tenanted gate, with the fleet's rate limit in front of it. The one composition where a
 /// server is not deciding alone: `limits` is the shared store, and both directions of it are
-/// here — blame goes out through the reporter's completion callback, and the share to refuse
-/// comes back through the layer on top.
+/// here — blame goes out through the reporter, and the share to refuse comes back through the
+/// layer on top.
 ///
 /// The limit is the **outermost** layer, above the queue. A request that is going to be refused
 /// must not first take a queue slot from one that is not.
@@ -143,8 +141,7 @@ pub(crate) fn queue_rate_limited<L, R>(
     instr: &RuntimeInstrumentation,
     handle: Handle,
     queue_timeout: Duration,
-    reporter: &TenantReporter,
-    write_blame: R,
+    reporter: &TenantReporter<R>,
     limits: Arc<L>,
 ) -> (
     RateLimitService<QueueService<SimReq, ()>, L>,
@@ -152,12 +149,12 @@ pub(crate) fn queue_rate_limited<L, R>(
 )
 where
     L: Limits,
-    R: Fn(&str, Duration) + Clone + Send + 'static,
+    R: Report + Send + 'static,
 {
     // Below the queue, so only admitted requests are occupiers — a waiter never pays. Above the
     // gate, so the shut-time it bills is the gate's own `Pending`.
     let inner = ServiceBuilder::new()
-        .layer(reporter.layer(write_blame))
+        .layer(reporter)
         .layer(CpuBackpressureLayer::new(instr))
         .service(app);
     let (queue, worker) = QueueLayer::new(queue_timeout).build(inner, handle);
@@ -180,7 +177,7 @@ pub(crate) fn queue_os_cpu(
     QueueService<SimReq, ()>,
     QueueWorker<DynamicConcurrencyLimitService<App>, SimReq, ()>,
 ) {
-    // The ceiling is the controller's; the limit layer only enforces it.
+    // loop { sleep(3secs); update_from_os_cpu(&limit); }
     let inner = ServiceBuilder::new()
         .layer(DynamicConcurrencyLimitLayer::from_handle(limit))
         .service(app);

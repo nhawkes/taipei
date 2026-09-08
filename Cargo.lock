@@ -3182,6 +3182,7 @@ dependencies = [
 name = "taipei"
 version = "0.1.0"
 dependencies = [
+ "bon",
  "delegate",
  "pin-project",
  "pin-project-lite",

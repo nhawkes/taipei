@@ -656,8 +656,8 @@ mod tests {
         samples.push_back(cut_sample(&steady(100.0)));
         let total = strip_rows(&samples, 0, 200.0);
         let wait = strip_rows(&samples, 1, 200.0);
-        assert_eq!(total[1].reading, "100 ms");
-        assert_eq!(wait[1].reading, "50 ms");
+        assert_eq!(total[1].reading, format!("{} ms", slots("100", 4)));
+        assert_eq!(wait[1].reading, format!("{} ms", slots("50", 4)));
         assert_ne!(total[1].points, wait[1].points, "the lines move with the reading");
     }
 

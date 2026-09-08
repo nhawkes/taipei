@@ -17,5 +17,6 @@ tower = { version = "0.5", features = ["util"] }
 pin-project-lite = "0.2"
 pin-project = "1"
 thiserror = "2"
+bon = "3"
 tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
 tokio-util = { version = "0.7", features = ["rt"] }

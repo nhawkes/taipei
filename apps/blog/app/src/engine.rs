@@ -36,7 +36,7 @@ use taipei::rate_limit::{Limits, Throttled};
 
 use crate::limits::Store;
 use taipei::reject::{BoxError, Overloaded};
-use taipei::tenant::TenantReporter;
+use taipei::tenant::{Report, TenantReporter};
 // The sim stage's palette, aliased: `Stage` here is already the protection stack's.
 use crate::atoms::stage::{Paint, Stage as Hue};
 use crate::hotswap::{HotSwap, HotSwapHandle};
@@ -1527,8 +1527,7 @@ type Worker = Pin<Box<dyn Future<Output = ()> + Send>>;
 /// The store is `Option` because the two tenanted sims want different halves of the seam:
 /// the blame panel only measures, and this chapter acts on the measurement.
 struct Billing<'a> {
-    reporter: &'a TenantReporter,
-    ledger: &'a Ledger,
+    reporter: &'a TenantReporter<BlameSink>,
     limits: Option<&'a Arc<Store>>,
 }
 
@@ -1582,27 +1581,19 @@ fn build_inner(
         Stage::Queue => match (billing, gate) {
             // The fleet's limit in front, and blame going to the store that decides it. The
             // front already speaks `BoxError`, so there is nothing to map.
-            (Some(Billing { reporter, ledger, limits: Some(limits) }), _) => {
-                let store = Arc::clone(limits);
-                let banked = ledger.writer();
-                let write_blame = move |tenant: &str, fare: Duration| {
-                    banked(tenant, fare);
-                    store.write_blame(tenant, fare);
-                };
+            (Some(Billing { reporter, limits: Some(limits) }), _) => {
                 let (svc, worker) = crate::compose::queue_rate_limited(
                     app,
                     &instr,
                     rt.clone(),
                     timeout,
                     reporter,
-                    write_blame,
                     Arc::clone(limits),
                 );
                 (BoxCloneService::new(svc), Some(Box::pin(worker.serve())), None)
             }
-            (Some(Billing { reporter, ledger, limits: None }), _) => {
-                let (svc, worker) =
-                    crate::compose::queue_tenant(app, &instr, rt.clone(), timeout, reporter, ledger.writer());
+            (Some(Billing { reporter, limits: None }), _) => {
+                let (svc, worker) = crate::compose::queue_tenant(app, &instr, rt.clone(), timeout, reporter);
                 (
                     BoxCloneService::new(svc.map_err(box_err::<QueueError>)),
                     Some(Box::pin(worker.serve())),
@@ -1788,11 +1779,11 @@ pub struct SimEngine {
     /// `None` and is bit-for-bit the sim it was.
     tenants: Option<TenantMix>,
     /// The reporter the stack bills through, paired with `tenants`.
-    reporter: Option<TenantReporter>,
+    reporter: Option<TenantReporter<BlameSink>>,
     /// The fleet's store, where this server is one of several sharing a budget. `Some` only in
     /// the rate-limiting sim; a tenanted engine without it measures and refuses nobody.
     limits: Option<Arc<Store>>,
-    /// Where the reporter's completion callback writes.
+    /// Where the reporter's blame is banked for the panel.
     ledger: Ledger,
     /// Carries the last pump event's reading across the frame boundary, so the interval that
     /// straddles two frames is one interval like any other.
@@ -1809,17 +1800,31 @@ pub struct SimEngine {
 #[derive(Clone, Default)]
 pub struct Ledger(Arc<Mutex<Vec<(&'static str, Duration)>>>);
 
+/// Where the reporter sends blame: the ledger the panel totals, and the fleet's store when
+/// this server is one of several sharing a budget.
+#[derive(Clone)]
+struct BlameSink {
+    ledger: Ledger,
+    store: Option<Arc<Store>>,
+}
+
+impl Report for BlameSink {
+    fn report(&self, tenant: &str, fare: Duration) {
+        self.ledger.bank(tenant, fare);
+        if let Some(store) = &self.store {
+            store.write_blame(tenant, fare);
+        }
+    }
+}
+
 impl Ledger {
-    /// The reporter's `report` closure. Bare push, no panic path: it runs during unwind.
-    fn writer(&self) -> impl Fn(&str, Duration) + Clone {
-        let inner = self.0.clone();
-        move |tenant: &str, fare: Duration| {
-            // The reporter hands back the `&str` it was admitted under, which is a `TenantSpec`
-            // id — so the table is the authority on the name, not the string that came back.
-            let named = TENANTS.iter().find(|t| t.id == tenant).map(|t| t.id).unwrap_or(SOLO);
-            if let Ok(mut l) = inner.lock() {
-                l.push((named, fare));
-            }
+    /// Bare push, no panic path: it runs during unwind.
+    fn bank(&self, tenant: &str, fare: Duration) {
+        // The reporter hands back the `&str` it was admitted under, which is a `TenantSpec`
+        // id — so the table is the authority on the name, not the string that came back.
+        let named = TENANTS.iter().find(|t| t.id == tenant).map(|t| t.id).unwrap_or(SOLO);
+        if let Ok(mut l) = self.0.lock() {
+            l.push((named, fare));
         }
     }
 
@@ -2090,7 +2095,9 @@ impl SimEngine {
             Self::seeded(seed, lambda, Stage::Queue, Some(Gate::RuntimeCpu), false, Behavior::Good);
         engine.reporter = Some({
             let _scope = engine.world.clock.enter();
-            TenantReporter::new()
+            TenantReporter::builder()
+                .report(BlameSink { ledger: engine.ledger.clone(), store: limits.clone() })
+                .build()
         });
         engine.limits = limits;
         engine.tenants = Some(TenantMix::new(seed, engine.world.now_ms()));
@@ -2152,11 +2159,7 @@ impl SimEngine {
             layers,
             self.concurrency_limit,
             timeout,
-            self.reporter.as_ref().map(|reporter| Billing {
-                reporter,
-                ledger: &self.ledger,
-                limits: self.limits.as_ref(),
-            }),
+            self.reporter.as_ref().map(|reporter| Billing { reporter, limits: self.limits.as_ref() }),
         );
         if let Some(worker) = worker {
             self.world.rt.spawn(worker);
