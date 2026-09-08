@@ -20,3 +20,10 @@ thiserror = "2"
 bon = "3"
 tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
 tokio-util = { version = "0.7", features = ["rt"] }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+axum = "0.7"
+http = "1"
+tokio = { version = "1", features = ["net", "rt-multi-thread"] }
+tower = { version = "0.5", features = ["util", "make"] }
