@@ -13,7 +13,7 @@ pub struct Doc {
 
 // ── Book structure ──────────────────────────────────────────────────────────
 // The ordered table of contents. Single source of truth for the index and for
-// chapter ordering; each `path` resolves to `docs/<path>.md` and `/docs/<path>`.
+// chapter ordering; each `path` resolves to `docs/<path>.md` and `/<path>`.
 
 pub struct BookChapter {
     pub title: &'static str,
@@ -42,7 +42,7 @@ pub const BOOK: &[BookChapter] = &[
 pub enum BlogRoute {
     #[route("/")]
     Index,
-    #[route("/docs/{slug}")]
+    #[route("/{slug}")]
     Doc { slug: String },
 }
 
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(content.doc("intro").unwrap().title, "Intro");
 
         // A file in a subdirectory is not a chapter: the scan is one level, so nothing
-        // nested is ever indexed — and `/docs/{slug}` cannot name it either.
+        // nested is ever indexed — and `/{slug}` cannot name it either.
         assert!(content.doc("notes/private").is_none());
         assert!(content.doc("private").is_none());
 
