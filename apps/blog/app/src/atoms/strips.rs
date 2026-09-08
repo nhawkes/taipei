@@ -147,6 +147,8 @@ pub mod styles {
     }};
 
     pub const SV: Style = css! {{
+        display: "inline-block",
+        min_width: "7ch",
         font_family: Face::mono,
         font_size: "11px",
         text_align: "right",

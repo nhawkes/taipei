@@ -12,7 +12,7 @@ use idyll::{live_view, Callback, Ctx, Event, Never, Setup, Signal};
 use std::rc::Rc;
 
 use crate::atoms::controls::styles as cstyles;
-use crate::atoms::figure::slots;
+use crate::atoms::figure::{FIG3, FIG4, FIG5};
 use crate::atoms::stage::{Paint, Stage as Ink};
 use crate::engine::{CpuTask, Obs, Outcome, SparkPoint, Station, CORES};
 use crate::simview::*;
@@ -1049,25 +1049,25 @@ pub async fn MachineView(
     // Readouts, styles and the swarm — each a memo over the frame, so it rewrites the
     // DOM only when its own value moves.
     // One reading, not a name and a number that happen to sit beside each other.
-    let arrived = memo(&ctx, &frame, |f| format!("{} arrived", slots(f.arrived, 4)));
+    let arrived = memo(&ctx, &frame, |f| f.arrived.to_string());
     let queue_n = memo(&ctx, &frame, |f| f.queue_len.to_string());
     let queue_line_sty = memo2(&ctx, &frame, &layout, |f, l| {
         lab_bold(l, QTAIL + 18.0, QTX_TOP_Y - 20.0, 13, if f.head_wait > 200.0 { RED } else { AMBER })
     });
-    let head_wait = memo(&ctx, &frame, |f| format!("head wait {} ms", slots(format!("{:.0}", f.head_wait), 4)));
+    let head_wait = memo(&ctx, &frame, |f| format!("{:.0}", f.head_wait));
     // The queue's own gauge already says how long the head has waited by where its dot
     // stands on the conveyor, so on a narrow stage this reading gives up its space.
     let head_wait_sty = memo2(&ctx, &frame, &layout, |f, l| {
         let base = lab(l, QTAIL + 24.0, QTX_TOP_Y + 30.0, 11, if f.head_wait > 900.0 { RED } else { MUTED });
         if l.narrow() { format!("{base};display:none") } else { base }
     });
-    let more = memo(&ctx, &frame, |f| if f.more > 0 { format!("… +{} more", slots(f.more, 3)) } else { String::new() });
+    let more = memo(&ctx, &frame, |f| f.more.to_string());
     // The elided tail's count. On a narrow stage the gate's own readings have wrapped
     // into this space and the queue's total is already stated above the pipe, so this
     // one gives up its room rather than sit on top of them.
-    let more_sty = memo(&ctx, &layout, |l| {
+    let more_sty = memo2(&ctx, &frame, &layout, |f, l| {
         let base = lab(l, QTAIL + 24.0, QY - 24.0, 11, MUTED);
-        match l.narrow() {
+        match f.more == 0 || l.narrow() {
             true => format!("{base};display:none"),
             false => base,
         }
@@ -1100,7 +1100,8 @@ pub async fn MachineView(
     // The one row that reports rather than labels an exit: it sits below the last pipe
     // instead of above it, which is its own slot.
     let row_flight = memo(&ctx, &layout, |l| row_c(l, ROW_IN_FLIGHT));
-    let cpu_lbl = memo(&ctx, &frame, |f| format!("CPU · busy {}/{CORES} ({}%)", f.busy, slots(f.util_pct, 3)));
+    let busy = memo(&ctx, &frame, |f| format!("{}/{CORES}", f.busy));
+    let util_pct = memo(&ctx, &frame, |f| f.util_pct.to_string());
     let cpu_lbl_sty = memo2(&ctx, &frame, &layout, |f, l| {
         let col = if f.util_pct > 100 { RED } else if f.util_pct >= 50 { AMBER } else { BLUE };
         let base = lab_bold(l, CPU_X + 78.0, CPU_Y - 8.0, 12, col);
@@ -1112,28 +1113,28 @@ pub async fn MachineView(
             None => base,
         }
     });
-    let offered = memo(&ctx, &frame, |f| format!("{}/s", slots(format!("{:.1}", f.offered), 5)));
-    let shed_n = memo(&ctx, &frame, |f| slots(f.shed_n, 4));
-    let gput = memo(&ctx, &frame, |f| format!("{}/s", slots(format!("{:.1}", f.gput), 5)));
-    let succ_n = memo(&ctx, &frame, |f| slots(f.succ_n, 4));
-    let rtmo_n = memo(&ctx, &frame, |f| slots(f.rtmo_n, 4));
-    let ptmo_n = memo(&ctx, &frame, |f| slots(f.ptmo_n, 4));
-    let inflight = memo(&ctx, &frame, |f| slots(f.inflight, 4));
+    let offered = memo(&ctx, &frame, |f| format!("{:.1}", f.offered));
+    let shed_n = memo(&ctx, &frame, |f| f.shed_n.to_string());
+    let gput = memo(&ctx, &frame, |f| format!("{:.1}", f.gput));
+    let succ_n = memo(&ctx, &frame, |f| f.succ_n.to_string());
+    let rtmo_n = memo(&ctx, &frame, |f| f.rtmo_n.to_string());
+    let ptmo_n = memo(&ctx, &frame, |f| f.ptmo_n.to_string());
+    let inflight = memo(&ctx, &frame, |f| f.inflight.to_string());
     let last_lat = memo(&ctx, &frame, |f| match f.last_lat {
-        Some(l) => format!("{} ms", slots(format!("{l:.0}"), 4)),
-        None => format!("{} ms", slots("—", 4)),
+        Some(l) => format!("{l:.0}"),
+        None => "—".to_string(),
     });
     let last_lat_sty = memo(&ctx, &frame, |f| match f.last_lat {
         Some(l) => format!("color:{}", if l > 2000.0 { RED } else if l > 700.0 { AMBER } else { MUTED }),
         None => format!("color:{MUTED}"),
     });
-    let ready_n = memo(&ctx, &frame, |f| format!("{} ready", slots(f.ready_n, 4)));
+    let ready_n = memo(&ctx, &frame, |f| f.ready_n.to_string());
     let ready_n_sty = memo2(&ctx, &frame, &layout, |f, l| {
         let col = if f.ready_n == 0 { GREEN } else if f.ready_n < 10 { ORANGE } else { RED };
         lab_r(l, PIPE_RET - 18.0, 320.0, 11, col)
     });
-    let io_sleeping = memo(&ctx, &frame, |f| format!("{} sleeping", slots(f.io_sleeping, 4)));
-    let syn_pending = memo(&ctx, &frame, |f| format!("{} pending", slots(f.syn_pending, 4)));
+    let io_sleeping = memo(&ctx, &frame, |f| f.io_sleeping.to_string());
+    let syn_pending = memo(&ctx, &frame, |f| f.syn_pending.to_string());
 
     // The shutter covers the exit that is shut. Resting over the *entrance* is the
     // idle pose — nothing is being admitted or shed, so neither exit is claimed.
@@ -1150,12 +1151,23 @@ pub async fn MachineView(
     // between the machine and the picture.
     let shutter_sty = memo2(&ctx, &frame, &layout, |f, l| shutter(l, f.gate_deg));
 
-    let gate_adm_lbl = memo(&ctx, &frame, |f| match (f.os_cpu_pct, f.limit) {
-        // The delayed signal, shown live beside its threshold — watching this number
-        // trail the instantaneous CPU readout is the OS-CPU tab's whole lesson.
-        (Some(pct), _) => format!("cpu avg {}% (<{:.0}%)", slots(pct, 3), crate::engine::OS_CPU_MAX * 100.0),
-        (None, Some(n)) => format!("limit {}", slots(n, 3)),
-        (None, None) => "< 50%".to_string(),
+    // The gate's reading in three parts around its number, so the number can hold a fixed
+    // box: "cpu avg 37% (<50%)" for the delayed signal — watching this number trail the
+    // instantaneous CPU readout is the OS-CPU tab's whole lesson — "limit 20" for a fixed
+    // ceiling, and the bare threshold when the gate is the runtime's own.
+    let gate_adm_pre = memo(&ctx, &frame, |f| match (f.os_cpu_pct, f.limit) {
+        (Some(_), _) => "cpu avg ",
+        (None, Some(_)) => "limit ",
+        (None, None) => "< 50%",
+    });
+    let gate_adm_n = memo(&ctx, &frame, |f| match (f.os_cpu_pct, f.limit) {
+        (Some(pct), _) => pct.to_string(),
+        (None, Some(n)) => n.to_string(),
+        (None, None) => String::new(),
+    });
+    let gate_adm_post = memo(&ctx, &frame, |f| match (f.os_cpu_pct, f.limit) {
+        (Some(_), _) => format!("% (<{:.0}%)", crate::engine::OS_CPU_MAX * 100.0),
+        _ => String::new(),
     });
     // Each gate reading washes to full only while its own exit is the open one, and
     // fades back otherwise — so the two labels and the shutter always say the same
@@ -1245,8 +1257,8 @@ pub async fn MachineView(
                     span css=[cstyles::PLOTTED] style=(format!("color:{AMBER}")) { $queue_n }
                     " · unbounded"
                 }
-                div css=[cstyles::LABEL] style=($head_wait_sty) { $head_wait }
-                div css=[cstyles::LABEL] style=($more_sty) { $more }
+                div css=[cstyles::LABEL] style=($head_wait_sty) { "head wait " span css=[FIG4] { $head_wait } " ms" }
+                div css=[cstyles::LABEL] style=($more_sty) { "… +" span css=[FIG3] { $more } " more" }
             }
 
             // The gate's two readings sit beside the fork, so they exist only where
@@ -1254,35 +1266,35 @@ pub async fn MachineView(
             // nothing to label — the verdict is the colour the dot leaves in.
             @if ($has_queue) {
                 div css=[cstyles::LABEL] style=($gate_tmo_lbl_sty) { $gate_tmo_lbl }
-                div css=[cstyles::LABEL] style=($gate_adm_lbl_sty) { $gate_adm_lbl }
+                div css=[cstyles::LABEL] style=($gate_adm_lbl_sty) { $gate_adm_pre span css=[FIG3] { $gate_adm_n } $gate_adm_post }
             }
 
-            div css=[cstyles::LABEL] style=($cpu_lbl_sty) { $cpu_lbl }
+            div css=[cstyles::LABEL] style=($cpu_lbl_sty) { "CPU · busy " $busy " (" span css=[FIG3] { $util_pct } "%)" }
 
             // stat rows over the exit pipes — each centred on the plumbing it reports on
             @if ($has_shed) {
                 div css=[cstyles::LABEL, $stacked_tmo => cstyles::STAT_SCRIM] style=($row_tmo) {
                     "offered "
-                    span css=[cstyles::PLOTTED] style=(format!("color:{ORANGE}")) { $offered }
+                    span css=[cstyles::PLOTTED, FIG5] style=(format!("color:{ORANGE}")) { $offered } "/s"
                     span css=[$tmo_sep => cstyles::HIDDEN] { $shed_row_lbl }
                     span css=[$tmo_tail => cstyles::STAT_TAIL] {
                         span css=[$wide => cstyles::HIDDEN] { $shed_row_tail }
-                        span style=($shed_n_sty) { $shed_n }
+                        span css=[FIG4] style=($shed_n_sty) { $shed_n }
                     }
                 }
             }
             div css=[cstyles::LABEL, $stacked_succ => cstyles::STAT_SCRIM] style=($row_succ) {
                 "goodput "
-                span css=[cstyles::PLOTTED] style=(format!("color:{GREEN}")) { $gput }
+                span css=[cstyles::PLOTTED, FIG5] style=(format!("color:{GREEN}")) { $gput } "/s"
                 span css=[$succ_sep => cstyles::HIDDEN] { " · " }
                 span css=[$succ_tail => cstyles::STAT_TAIL] {
                     "success "
-                    span style=(format!("color:{GREEN}")) { $succ_n }
+                    span css=[FIG4] style=(format!("color:{GREEN}")) { $succ_n }
                 }
                 span css=[$rtmo_sep => cstyles::HIDDEN] { " · " }
                 span css=[$rtmo_tail => cstyles::STAT_TAIL] {
                     "response timeout "
-                    span style=(format!("color:{RED}")) { $rtmo_n }
+                    span css=[FIG4] style=(format!("color:{RED}")) { $rtmo_n }
                 }
             }
             @if ($has_queue) {
@@ -1290,22 +1302,22 @@ pub async fn MachineView(
                     "processing "
                     span css=[$proc_tail => cstyles::STAT_TAIL] {
                         "timeout "
-                        span style=(format!("color:{SALMON}")) { $ptmo_n }
+                        span css=[FIG4] style=(format!("color:{SALMON}")) { $ptmo_n }
                     }
                 }
             }
             div css=[cstyles::LABEL, $stacked_flight => cstyles::STAT_SCRIM] style=($row_flight) {
                 "in-flight "
-                span css=[cstyles::PLOTTED] style=(format!("color:{BLUE}")) { $inflight }
+                span css=[cstyles::PLOTTED, FIG4] style=(format!("color:{BLUE}")) { $inflight }
                 span css=[$flight_sep => cstyles::HIDDEN] { " · " }
                 span css=[$flight_tail => cstyles::STAT_TAIL] {
                     "last latency "
-                    span style=($last_lat_sty) { $last_lat }
+                    span css=[FIG4] style=($last_lat_sty) { $last_lat } " ms"
                 }
             }
 
-            div css=[cstyles::LABEL] style=($ready_n_sty) { $ready_n }
-            div css=[cstyles::LABEL] style=($io_sleeping_sty) { $io_sleeping }
+            div css=[cstyles::LABEL] style=($ready_n_sty) { span css=[FIG4] { $ready_n } " ready" }
+            div css=[cstyles::LABEL] style=($io_sleeping_sty) { span css=[FIG4] { $io_sleeping } " sleeping" }
 
             // ── the machine: the cores' burst rings, in the machine's own box ──
             div css=[cstyles::MACHINE] style=($machine_sty) {
@@ -1319,9 +1331,9 @@ pub async fn MachineView(
             div css=[cstyles::LABEL] style=($arrived_sty) {
                 "TCP SYN"
                 span css=[$syn_sep => cstyles::HIDDEN] { " · " }
-                span css=[$syn_tail => cstyles::STAT_TAIL] { $arrived }
+                span css=[$syn_tail => cstyles::STAT_TAIL] { span css=[FIG4] { $arrived } " arrived" }
             }
-            div css=[cstyles::LABEL] style=($syn_pending_sty) { $syn_pending }
+            div css=[cstyles::LABEL] style=($syn_pending_sty) { span css=[FIG4] { $syn_pending } " pending" }
 
             // ── the dot swarm ──
             @for d in $dots [key = d.key] {

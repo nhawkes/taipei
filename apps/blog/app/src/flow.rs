@@ -21,7 +21,8 @@ use std::collections::VecDeque;
 use idyll::{live_view, Ctx, MutableVec, Rect, Setup, Shape, Signal};
 use idyll_styles::styles;
 
-use crate::atoms::figure::{count, slots};
+use crate::atoms::figure::FIG3;
+use crate::atoms::server_box::group;
 use crate::atoms::button::styles as bstyles;
 use crate::atoms::client_strip::{ink, ink_frame, ClientStrip};
 use crate::atoms::lanes::{Ink, LaneTier, WIRES};
@@ -186,8 +187,8 @@ pub(crate) async fn run(
     };
 
     let qps = ctx.mutable_signal(OPENS_AT);
-    let served = ctx.mutable_signal(count(0));
-    let refused = ctx.mutable_signal(count(0));
+    let served = ctx.mutable_signal(group(0));
+    let refused = ctx.mutable_signal(group(0));
     let aggs = vec![("served", served.read()), ("retried", refused.read())];
 
     // The crowd itself, one circle each: orange while a client is owed an answer. Above the
@@ -223,7 +224,8 @@ pub(crate) async fn run(
 
     // The gap between the busiest machine and the emptiest — what picking blindly costs,
     // before any of it has become a latency. This is the reading the loop card is for.
-    let spread = ctx.mutable_signal("—".to_string());
+    let spread_most = ctx.mutable_signal("—".to_string());
+    let spread_least = ctx.mutable_signal("—".to_string());
 
     let policy = ctx.mutable_signal(0usize);
     let items: Vec<ToggleItem> = cast
@@ -329,7 +331,7 @@ pub(crate) async fn run(
     let is_policies = shows == Shows::Policies;
     let is_pool = shows == Shows::Pool;
     let has_pill = is_policies || is_pool;
-    let spread_text = spread.read();
+    let (spread_most_read, spread_least_read) = (spread_most.read(), spread_least.read());
 
     let mut ctx = ctx.render(live_view! {
         div css=[card::CARD] role=("group") aria_label=(title) {
@@ -358,7 +360,7 @@ pub(crate) async fn run(
                 }
                 canvas css=[wstyles::WIRES, wstyles::UNDER] painting=(picture) {}
             }
-            div css=[styles::LABEL] { "busiest machine over emptiest · " span { $spread_text } }
+            div css=[styles::LABEL] { "busiest machine over emptiest · " span css=[FIG3] { $spread_most_read } " over " span css=[FIG3] { $spread_least_read } }
             @if (has_pill) {
                 div css=[styles::LABEL] { "experience · shared ms scale · recent requests" }
                 div css=[styles::DIAL] style=($cut_ink) {
@@ -560,11 +562,13 @@ pub(crate) async fn run(
                     signal.set(&turn, server.counts);
                 }
                 let loads: Vec<usize> = fleet.iter().map(|s| s.counts.inflight).collect();
-                spread.set(&turn, spread_text_of(&loads));
+                let (most, least) = spread_of(&loads);
+                spread_most.set(&turn, most);
+                spread_least.set(&turn, least);
 
                 let answered = engine.answered();
-                served.set(&turn, count(answered.trips));
-                refused.set(&turn, count(answered.refusals));
+                served.set(&turn, group(answered.trips));
+                refused.set(&turn, group(answered.refusals));
                 ink_frame(&turn, &mut faces, &ink_signals, &engine.outstanding());
 
                 // The frame's departures become pulses: a send in teal, an answer home in
@@ -878,19 +882,19 @@ fn against(column: usize, ms: f64, baseline: Option<f64>) -> Option<Against> {
 
 /// The imbalance, as the two numbers it is made of. A ratio would hide the case the chapter is
 /// about — a machine with nothing on it, where the ratio is not a number at all.
-fn spread_text_of(loads: &[usize]) -> String {
+fn spread_of(loads: &[usize]) -> (String, String) {
     match (loads.iter().max(), loads.iter().min()) {
-        (Some(&most), Some(&least)) => format!("{} over {}", slots(most, 3), slots(least, 3)),
-        _ => "—".to_string(),
+        (Some(&most), Some(&least)) => (most.to_string(), least.to_string()),
+        _ => ("—".to_string(), "—".to_string()),
     }
 }
 
 fn fmt_qps(v: f64) -> String {
-    format!("{}/s", slots(format!("{v:.0}"), 4))
+    format!("{v:.0}/s")
 }
 
 fn fmt_pool(v: f64) -> String {
-    format!("{} of {SERVERS}", slots(format!("{v:.0}"), 2))
+    format!("{v:.0} of {SERVERS}")
 }
 
 /// What the phone's column says with nothing to show. It mirrors whichever policy the pill has

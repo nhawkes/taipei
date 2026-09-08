@@ -18,7 +18,7 @@ use std::rc::Rc;
 
 use idyll::{live_view, Ctx, Setup, Signal};
 use idyll_styles::styles;
-use crate::atoms::figure::slots;
+use crate::atoms::figure::{FIG3, FIG4};
 use crate::atoms::cut::styles as cut_styles;
 
 use crate::atoms::button::styles as bstyles;
@@ -230,13 +230,15 @@ pub(crate) async fn run(
     ctx.frames(&running.read(), PercentileMsg::Tick);
 
     let counted = ctx.mutable_signal(PRESETS[OPENS_ON].batch);
-    let count = {
+    let (clients, servers, requests) = {
         let counted = counted.read();
-        ctx.computed(move |cx| {
-            let b = counted.get(cx);
-            format!("{} clients · {} servers · {} requests", slots(b.clients, 3), slots(b.servers, 3), slots(b.requests(), 4))
-        })
-        .read()
+        let c = counted.clone();
+        let s = counted.clone();
+        (
+            ctx.computed(move |cx| c.get(cx).clients.to_string()).read(),
+            ctx.computed(move |cx| s.get(cx).servers.to_string()).read(),
+            ctx.computed(move |cx| counted.get(cx).requests().to_string()).read(),
+        )
     };
     let landed = ctx.mutable_signal(String::from(AT_REST));
 
@@ -334,7 +336,7 @@ pub(crate) async fn run(
                 ToggleGroup items=(scales) knob=(scale_knob) picked=>(PercentileMsg::Scale)
                 button css=[bstyles::BASE, bstyles::CTA]
                     onclick=>(|_| Some(PercentileMsg::Send)) { "▶ send" }
-                span css=[card::COUNT] { $count }
+                span css=[card::COUNT] { span css=[FIG3] { $clients } " clients · " span css=[FIG3] { $servers } " servers · " span css=[FIG4] { $requests } " requests" }
             }
             div css=[styles::LAB] {
                 "experience breakdown · " span css=[styles::RECV] { $landed } " · shared ms scale"
@@ -500,7 +502,7 @@ impl Readouts {
             turn,
             match &machine.engine {
                 None => String::from(AT_REST),
-                Some(_) => format!("{} / {} clients", slots(home.len(), 3), batch.clients),
+                Some(_) => format!("{} / {} clients", home.len(), batch.clients),
             },
         );
         for ((ring, painted), next) in
@@ -806,7 +808,9 @@ pub mod styles {
 
     /// How much of the batch is home, inside the caption. Tabular so a count that climbs every
     /// frame does not shuffle the words after it.
+    /// Boxed to its longest phrasing, the resting one, so the words after it never shift.
     pub const RECV: Style = css! {{
-        font_variant_numeric: "tabular-nums",
+        display: "inline-block",
+        min_width: "27ch",
     }};
 }

@@ -17,12 +17,11 @@ use std::collections::VecDeque;
 
 use idyll::{live_view, Ctx, MutableVec, Rect, Setup, Shape, Signal};
 
-use crate::atoms::figure::{count, slots};
 use crate::atoms::client_strip::{ink, ink_frame, ClientStrip};
 use crate::atoms::button::styles as bstyles;
 use crate::atoms::lanes::{Ink, LaneTier, WIRES};
 use crate::atoms::legend::{Key, Legend};
-use crate::atoms::server_box::{server_name, ServerBox};
+use crate::atoms::server_box::{group, server_name, ServerBox};
 use crate::atoms::sim_card::{styles as card, SimHeader};
 use crate::atoms::slider::{fmt_speed, raw_from_speed, speed_from_raw, Name, Scale, Slider};
 use crate::atoms::stage::{Paint, Stage};
@@ -236,8 +235,8 @@ pub(crate) async fn run(
     let qps_at = qps.read();
     let speed = ctx.mutable_signal(raw_from_speed(SPEED));
     let speed_at = speed.read();
-    let served = ctx.mutable_signal(count(0));
-    let refused = ctx.mutable_signal(count(0));
+    let served = ctx.mutable_signal(group(0));
+    let refused = ctx.mutable_signal(group(0));
     let aggs = vec![("served", served.read()), ("refused", refused.read())];
 
     let shown = ctx.mutable_signal(0usize);
@@ -448,8 +447,8 @@ impl Readouts {
         }
         self.rotation.set(turn, arm.rotation);
         let answered = arm.engine.answered();
-        self.served.set(turn, count(answered.trips));
-        self.refused.set(turn, count(answered.refusals));
+        self.served.set(turn, group(answered.trips));
+        self.refused.set(turn, group(answered.refusals));
         ink_frame(turn, &mut self.faces, &self.ink, &arm.engine.outstanding());
         self.steering.set(turn, arm.steering());
     }
@@ -548,12 +547,12 @@ fn row(label: &'static str, axis: f64, ink: Paint, values: Vec<f64>, unit: &str)
         .collect::<Vec<_>>()
         .join(" ");
     let reading = match values.last() {
-        Some(v) => format!("{}{unit}", slots(format!("{v:.0}"), 4)),
-        None => format!("{}{unit}", slots("–", 4)),
+        Some(v) => format!("{v:.0}{unit}"),
+        None => format!("–{unit}"),
     };
     StripRow { label, points, reading, ink: ink.to_string() }
 }
 
 fn fmt_qps(v: f64) -> String {
-    format!("{}/s", slots(format!("{v:.0}"), 4))
+    format!("{v:.0}/s")
 }

@@ -10,7 +10,6 @@
 use idyll::{live_view, Ctx, Never, Setup, Signal};
 use idyll_styles::styles;
 
-use crate::atoms::figure::slots;
 use crate::atoms::stage::Paint;
 
 /// One phase's bar. Positions are in milliseconds; the atom scales them against `axis`.
@@ -97,11 +96,11 @@ fn label(r: &Scaled) -> String {
 }
 
 fn p50(r: &Scaled) -> String {
-    format!("{} ms", slots(r.bar.p50.round() as i64, 4))
+    format!("{} ms", r.bar.p50.round() as i64)
 }
 
 fn pct(r: &Scaled) -> String {
-    r.bar.pct.map(|share| format!("{}%", slots(share, 3))).unwrap_or_default()
+    r.bar.pct.map(|share| format!("{share}%")).unwrap_or_default()
 }
 
 /// The row's hue rides the inline style with its geometry: a live table's rows are keyed by

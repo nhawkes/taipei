@@ -1,20 +1,17 @@
-//! A number that animates keeps its width: the slots it is not using are filled with the
-//! figure space, a character one digit wide, so a reading is as wide at 0 as at 9999 and
-//! nothing beside it moves as it counts.
+//! A number's box: as wide at its widest as at 0, so nothing beside a reading moves as it
+//! counts. `1ch` is a digit's width and the page sets tabular figures, so `Nch` holds N digits
+//! exactly; the number sits against the right edge and grows leftwards into the room it has.
 
-const FIGURE_SPACE: char = '\u{2007}';
+use idyll_styles::styles;
 
-/// `value` right-aligned in `width` digit-wide slots.
-pub fn slots(value: impl std::fmt::Display, width: usize) -> String {
-    let text = value.to_string();
-    let pad = width.saturating_sub(text.chars().count());
-    let mut out = String::with_capacity(pad + text.len());
-    out.extend(std::iter::repeat(FIGURE_SPACE).take(pad));
-    out.push_str(&text);
-    out
+#[styles]
+pub mod styles {
+    use idyll_styles::Style;
+
+    pub const FIG3: Style = css! {{ display: "inline-block", min_width: "3ch", text_align: "right" }};
+    pub const FIG4: Style = css! {{ display: "inline-block", min_width: "4ch", text_align: "right" }};
+    pub const FIG5: Style = css! {{ display: "inline-block", min_width: "5ch", text_align: "right" }};
+    pub const FIG9: Style = css! {{ display: "inline-block", min_width: "9ch", text_align: "right" }};
 }
 
-/// A running count as the cards and boxes show it: thousands grouped, five slots wide.
-pub fn count(v: usize) -> String {
-    slots(crate::atoms::server_box::group(v), 5)
-}
+pub use styles::{FIG3, FIG4, FIG5, FIG9};

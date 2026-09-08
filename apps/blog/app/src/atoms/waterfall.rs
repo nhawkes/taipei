@@ -12,7 +12,6 @@
 use idyll::{live_view, Ctx, Never, Setup, Signal};
 use idyll_styles::styles;
 
-use crate::atoms::figure::slots;
 use crate::atoms::stage::{Paint, Stage};
 
 /// One phase of the trip. Milliseconds — the atom scales them against `axis`.
@@ -108,7 +107,7 @@ pub async fn Waterfall(
                         div css=[styles::WGIVE] style=(whisker(&$r)) {}
                     }
                     span css=[styles::WV] {
-                        span { (reading(&$r)) }
+                        span css=[styles::WN] { (reading(&$r)) }
                         span css=[styles::WD] style=(gain(&$r)) { (against(&$r)) }
                     }
                 }
@@ -135,8 +134,8 @@ fn label(r: &Placed) -> String {
 
 fn reading(r: &Placed) -> String {
     match r.leg.ms {
-        Some(ms) => format!("{} ms", slots(ms.round() as i64, 4)),
-        None => format!("{} ms", slots("–", 4)),
+        Some(ms) => format!("{} ms", ms.round() as i64),
+        None => "– ms".to_string(),
     }
 }
 
@@ -145,7 +144,7 @@ fn reading(r: &Placed) -> String {
 fn against(r: &Placed) -> String {
     match r.leg.against {
         Some(Against::Baseline) => "baseline".to_string(),
-        Some(Against::By(pc)) => format!("{}%", slots(format!("{pc:+.0}"), 4)),
+        Some(Against::By(pc)) => format!("{pc:+.0}%"),
         None => String::new(),
     }
 }
@@ -163,8 +162,8 @@ fn gain(r: &Placed) -> String {
 
 fn total_reading(trip: &f64) -> String {
     match *trip > 0.0 {
-        true => format!("{} ms", slots(trip.round() as i64, 4)),
-        false => format!("{} ms", slots("–", 4)),
+        true => format!("{} ms", trip.round() as i64),
+        false => "– ms".to_string(),
     }
 }
 
@@ -243,6 +242,7 @@ pub mod styles {
         display: "flex",
         flex_direction: "column",
         align_items: "flex-end",
+        min_width: "7ch",
         font_family: Face::mono,
         font_size: "11px",
         line_height: 1.15,
@@ -253,7 +253,17 @@ pub mod styles {
 
     /// The comparison under a reading. Quieter and smaller than the number it qualifies, and in
     /// the same column — the row is no wider for having one.
+    /// The reading, in a box as wide as its widest so the comparison under it never shifts.
+    pub const WN: Style = css! {{
+        display: "inline-block",
+        min_width: "7ch",
+        text_align: "right",
+    }};
+
     pub const WD: Style = css! {{
+        display: "inline-block",
+        min_width: "8ch",
+        text_align: "right",
         font_size: "9.5px",
         color: Palette::ink_faint,
         white_space: "nowrap",

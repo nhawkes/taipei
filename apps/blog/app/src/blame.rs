@@ -17,7 +17,7 @@ use std::time::Duration;
 use idyll::{live_view, Ctx, Rect, Setup, Signal};
 use idyll_styles::styles;
 
-use crate::atoms::figure::slots;
+use crate::atoms::figure::{FIG3, FIG4, FIG5, FIG9};
 use crate::atoms::controls::styles as cstyles;
 use crate::atoms::framed::Framed;
 use crate::atoms::invite::Invite;
@@ -646,7 +646,7 @@ impl Panel {
                         ),
                         bar_pct: (100.0 * held / METER_FULL_US).min(100.0),
                         tick: match self.shut_now {
-                            true => format!("+{}µs (1/{n})", slots(format!("{:.0}", us(self.charge)), 4)),
+                            true => format!("+{:.0}µs (1/{n})", us(self.charge)),
                             false => "no queue — paused".to_string(),
                         },
                         accrued: grouped(held),
@@ -673,7 +673,7 @@ impl Panel {
                 key: k,
                 color: tenant_paint(k),
                 id: TENANTS[k].id,
-                total: format!("{} µs", slots(grouped(us(self.fares[k])), 7)),
+                total: format!("{} µs", grouped(us(self.fares[k]))),
             })
             .collect();
 
@@ -687,14 +687,11 @@ impl Panel {
             meters,
             long_lines,
             long_totals,
-            long_peak: format!("axis 0 → 1.00 · window peak {}", slots(format!("{peak:.2}"), 4)),
+            long_peak: format!("{peak:.2}"),
             long_window_text: format!("{:.1} s", LONG_SAMPLE_MS * LONG_BARS as f64 / 1000.0),
-            long_rate_text: format!(
-                "{} µs per µs of wall clock",
-                slots(format!("{:.2}", self.long.back().map_or(0.0, |p| p.tot)), 5)
-            ),
+            long_rate_text: format!("{:.2}", self.long.back().map_or(0.0, |p| p.tot)),
             long_fill_text: match span < LONG_BARS {
-                true => format!("filling — {} s so far", slots(format!("{:.1}", span as f64 * LONG_SAMPLE_MS / 1000.0), 4)),
+                true => format!("filling — {:.1} s so far", span as f64 * LONG_SAMPLE_MS / 1000.0),
                 false => "full".to_string(),
             },
             queueing_text: if self.shut_now { "queueing" } else { "no queue" },
@@ -703,14 +700,14 @@ impl Panel {
                 false => format!("font-weight:600;color:{}", crate::styles::Palette::ink_faint.value()),
             },
             product_text: match (self.shut_now, occupancy) {
-                (true, 0) | (false, _) => format!("{} × {occupancy} → {}", u8::from(self.shut_now), slots("nothing minted", 22)),
-                (true, _) => format!("1 × {occupancy} → {} µs each per slice", slots(format!("{:.0}", us(self.charge)), 4)),
+                (true, 0) | (false, _) => format!("{} × {occupancy} → nothing minted", u8::from(self.shut_now)),
+                (true, _) => format!("1 × {occupancy} → {:.0} µs each per slice", us(self.charge)),
             },
-            unattributed_text: slots(grouped(us(self.unattributed)), 7),
-            inflight: slots(occupancy, 2),
+            unattributed_text: grouped(us(self.unattributed)),
+            inflight: occupancy.to_string(),
             gate_label: if self.shut_now { "shut" } else { "open" },
-            rate_text: slots(grouped(us(self.meter)), 7),
-            clock_text: format!("{} ms", slots(format!("{now:.0}"), 5)),
+            rate_text: grouped(us(self.meter)),
+            clock_text: format!("{now:.0}"),
         }
     }
 }
@@ -1002,12 +999,13 @@ pub(crate) async fn run(ctx: Ctx<Setup, BlameMsg>, _seed: crate::PageSeed, _key:
           div css=[crate::atoms::sim_card::styles::CARD] {
             div css=[styles::HEAD] {
                 span css=[styles::READOUT] {
-                    "N = " $inflight " · gate " $gate_label " · rate " $rate_text
-                    " µs · unattributed " $unattributed_text " µs · clock " $clock_text
+                    "N = " span css=[FIG3] { $inflight } " · gate " $gate_label
+                    " · rate " span css=[FIG9] { $rate_text } " µs · unattributed "
+                    span css=[FIG9] { $unattributed_text } " µs · clock " span css=[FIG5] { $clock_text } " ms"
                 }
                 span css=[styles::HEAD_READ] {
                     span style=($queueing_ink) { $queueing_text }
-                    " · " $product_text
+                    " · " span css=[styles::PRODUCT] { $product_text }
                 }
             }
 
@@ -1086,7 +1084,7 @@ pub(crate) async fn run(ctx: Ctx<Setup, BlameMsg>, _seed: crate::PageSeed, _key:
             div css=[styles::PANE, styles::RULE] {
                 div css=[styles::LONG_HEAD] {
                     span css=[styles::LONG_TITLE] { "Total blame · sliding " $long_window_text " window" }
-                    span css=[styles::LONG_NOW] { "now " $long_rate_text " · " $long_fill_text }
+                    span css=[styles::LONG_NOW] { "now " span css=[FIG5] { $long_rate_text } " µs per µs of wall clock · " span css=[styles::FILLING] { $long_fill_text } }
                     div css=[styles::LONG_KEY] {
                         @for t in $long_totals [key = t.key] {
                             span css=[styles::KEY_ITEM] {
@@ -1103,7 +1101,7 @@ pub(crate) async fn run(ctx: Ctx<Setup, BlameMsg>, _seed: crate::PageSeed, _key:
                             polyline css=[styles::TENANT_LINE] points=(line_points(&$l)) style=(line_style(&$l)) {}
                         }
                     }
-                    div css=[styles::PEAK] { $long_peak }
+                    div css=[styles::PEAK] { "axis 0 → 1.00 · window peak " span css=[FIG4] { $long_peak } }
                 }
             }
 
@@ -1468,11 +1466,23 @@ pub mod styles {
         gap: "12px",
         flex_wrap: "wrap",
         margin: "0 4px 12px",
-    }};    pub const HEAD_READ: Style = css! {{
+    }};
+    pub const HEAD_READ: Style = css! {{
         margin_left: "auto",
         font_family: Face::mono,
         font_size: "12px",
         color: Palette::ink_muted,
+    }};
+    /// The header's verdict, boxed to its longest phrasing so the two it alternates between
+    /// take the same room.
+    pub const PRODUCT: Style = css! {{
+        display: "inline-block",
+        min_width: "31ch",
+    }};
+    /// The window's fill state, boxed the same way.
+    pub const FILLING: Style = css! {{
+        display: "inline-block",
+        min_width: "22ch",
     }};
 
     /// An inner panel: the reading surface inside the card.
@@ -1798,6 +1808,9 @@ pub mod styles {
         color: Palette::ink_muted,
     }};
     pub const KEY_TOTAL: Style = css! {{
+        display: "inline-block",
+        min_width: "12ch",
+        text_align: "right",
         font_family: Face::mono,
         font_size: "12px",
         font_weight: 600,

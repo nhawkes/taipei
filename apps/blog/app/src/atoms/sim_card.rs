@@ -83,5 +83,11 @@ pub mod styles {
         color: Palette::ink_muted,
         font_variant_numeric: "tabular-nums",
     }};
-    pub const AGGB: Style = css! {{ color: Palette::control_ink, font_weight: 600 }};
+    pub const AGGB: Style = css! {{
+        display: "inline-block",
+        min_width: "5ch",
+        text_align: "right",
+        color: Palette::control_ink,
+        font_weight: 600,
+    }};
 }

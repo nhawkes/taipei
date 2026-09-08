@@ -266,8 +266,8 @@ pub mod styles {
     /// The live value, as a pill beside the rail — tabular so the digits stay put
     /// while it counts.
     pub const VALUE: Style = css! {{
-        min_width: "56px",
-        text_align: "center",
+        min_width: "8ch",
+        text_align: "right",
         font_size: "13px",
         font_variant_numeric: "tabular-nums",
         color: Palette::readout_ink,

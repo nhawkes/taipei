@@ -81,7 +81,7 @@ fn field(
 #[idyll::component]
 async fn Metric(ctx: Ctx<Setup, Never>, label: &'static str, hue: Style, v: Signal<usize>) -> idyll::Result {
     let count = v.clone();
-    let text = ctx.computed(move |cx| crate::atoms::figure::count(count.get(cx))).read();
+    let text = ctx.computed(move |cx| group(count.get(cx))).read();
     let zero = ctx.computed(move |cx| v.get(cx) == 0).read();
     Ok(ctx.render(live_view! {
         div css=[styles::M] {
@@ -368,7 +368,7 @@ pub mod styles {
         gap: "6px",
     }};
     pub const ML: Style = css! {{ color: "#9aa08d" }};
-    pub const MV: Style = css! {{ font_weight: 600 }};
+    pub const MV: Style = css! {{ display: "inline-block", min_width: "5ch", text_align: "right", font_weight: 600 }};
 
     // The station hues are the diagram's shared vocabulary — one source in `stage.rs`.
     pub const TEAL: Style = css! {{ color: Stage::teal }};
