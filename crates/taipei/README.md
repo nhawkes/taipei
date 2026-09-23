@@ -42,6 +42,4 @@ fn main() -> anyhow::Result<()> {
     })
 }
 ```
-[And a full visualization](https://taipei-book.pages.dev/intro)
-
-[We'll walk through why each component exists step-by-step.](https://taipei-book.pages.dev/modelling_a_server)
+[Read more](https://taipei-book.pages.dev/intro)
