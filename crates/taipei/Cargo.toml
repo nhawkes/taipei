@@ -1,0 +1,34 @@
+[package]
+name = "taipei"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A library that integrates with tower to enable writing servers that behave well under stress without tuning"
+repository = "https://github.com/nhawkes/taipei"
+homepage = "https://taipei-book.pages.dev"
+readme = "README.md"
+keywords = ["tower", "queue", "backpressure", "load-shedding", "server"]
+categories = ["network-programming", "asynchronous", "web-programming::http-server"]
+
+[features]
+default = ["tokio"]
+tokio = ["tokio/rt-multi-thread"]
+
+[dependencies]
+delegate = "0.13"
+tower = { version = "0.5", features = ["util"] }
+pin-project-lite = "0.2"
+thiserror = "2"
+bon = "3"
+tokio = { version = "1", features = ["sync", "time", "macros", "rt"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+axum = "0.7"
+http = "1"
+tokio = { version = "1", features = ["net", "rt-multi-thread", "test-util"] }
+tower = { version = "0.5", features = ["util", "make"] }
+
+[package.metadata.docs.rs]
+all-features = true
