@@ -1,7 +1,7 @@
 use axum::{error_handling::HandleErrorLayer, routing::get, Router};
 use http::StatusCode;
 use taipei::backpressure::{CpuBackpressureLayer, InstrumentedRuntime as _};
-use taipei::queue::{QueueError, QueueLayer, DEFAULT_QUEUE_TIMEOUT};
+use taipei::queue::{QueueError, QueueLayer};
 use taipei::tokio::InstrumentedTokioRuntime;
 use tower::{make::Shared, ServiceBuilder};
 
@@ -17,7 +17,7 @@ fn main() -> anyhow::Result<()> {
     let inner = ServiceBuilder::new()
         .layer(CpuBackpressureLayer::new(&instr))
         .service(my_service);
-    let (service, worker) = QueueLayer::new(DEFAULT_QUEUE_TIMEOUT).build(inner, handle.clone());
+    let (service, worker) = QueueLayer::new().build(inner, handle.clone());
 
     // handle timeout in queue and other errors
     let service = Shared::new(

@@ -14,9 +14,6 @@ use tokio_util::sync::{PollSendError, PollSender};
 use tokio_util::task::{AbortOnDropHandle, TaskTracker};
 use tower::{Service, ServiceExt};
 
-pub const DEFAULT_CAPACITY: usize = 1 << 16;
-pub const DEFAULT_QUEUE_TIMEOUT: Duration = Duration::from_millis(100);
-
 #[derive(Clone)]
 pub struct QueueTimeout(Arc<AtomicU64>);
 
@@ -65,23 +62,50 @@ pub struct QueueLayer {
     capacity: usize,
 }
 
+impl Default for QueueLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[bon::bon]
 impl QueueLayer {
-    pub fn new(queue_timeout: Duration) -> Self {
+    #[builder(
+        start_fn(name = builder, vis = "pub"),
+        finish_fn(name = build, vis = "pub"),
+        builder_type(name = QueueLayerBuilder, vis = "pub")
+    )]
+    fn configured(
+        #[builder(
+            default = Duration::from_millis(100),
+            setters(name = with_custom_queue_timeout, option_fn(vis = ""))
+        )]
+        queue_timeout: Duration,
+        #[builder(default = 1 << 16, setters(name = with_custom_capacity, option_fn(vis = "")))]
+        capacity: usize,
+        #[builder(setters(option_fn(vis = "")))] processing_timeout: Option<Duration>,
+    ) -> Self {
         Self {
             queue_timeout: QueueTimeout::new(queue_timeout),
-            processing_timeout: None,
-            capacity: DEFAULT_CAPACITY,
+            processing_timeout,
+            capacity,
         }
     }
+}
 
-    pub fn with_capacity(mut self, capacity: usize) -> Self {
-        self.capacity = capacity;
-        self
+impl QueueLayer {
+    pub fn new() -> Self {
+        Self::builder().build()
     }
 
-    pub fn with_processing_timeout(mut self, timeout: Duration) -> Self {
-        self.processing_timeout = Some(timeout);
-        self
+    pub fn with_custom_queue_timeout(queue_timeout: Duration) -> Self {
+        Self::builder()
+            .with_custom_queue_timeout(queue_timeout)
+            .build()
+    }
+
+    pub fn with_custom_capacity(capacity: usize) -> Self {
+        Self::builder().with_custom_capacity(capacity).build()
     }
 
     pub fn timeout(&self) -> QueueTimeout {
